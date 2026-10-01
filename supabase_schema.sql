@@ -334,10 +334,10 @@ ALTER TABLE security_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE verification_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE system_settings ENABLE ROW LEVEL SECURITY;
 
--- Helper functions for RLS checks
+-- Helper functions for RLS checks (SECURE: explicit search_path prevents schema hijacking)
 CREATE OR REPLACE FUNCTION current_app_user_id() RETURNS UUID AS $$
     SELECT id FROM users WHERE auth_user_id = auth.uid() LIMIT 1;
-$$ LANGUAGE sql STABLE SECURITY DEFINER;
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp;
 
 CREATE OR REPLACE FUNCTION has_permission(user_uuid UUID, required_perm VARCHAR) RETURNS BOOLEAN AS $$
     SELECT EXISTS (
@@ -347,7 +347,7 @@ CREATE OR REPLACE FUNCTION has_permission(user_uuid UUID, required_perm VARCHAR)
         JOIN permissions p ON rp.permission_id = p.id
         WHERE ur.user_id = user_uuid AND p.code = required_perm
     );
-$$ LANGUAGE sql STABLE SECURITY DEFINER;
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp;
 
 CREATE OR REPLACE FUNCTION is_super_admin(user_uuid UUID) RETURNS BOOLEAN AS $$
     SELECT EXISTS (
@@ -356,7 +356,48 @@ CREATE OR REPLACE FUNCTION is_super_admin(user_uuid UUID) RETURNS BOOLEAN AS $$
         JOIN roles r ON ur.role_id = r.id
         WHERE ur.user_id = user_uuid AND r.code = 'SUPER_ADMIN'
     );
-$$ LANGUAGE sql STABLE SECURITY DEFINER;
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp;
+
+-- System & Configuration Read Policies (Authenticated Users)
+CREATE POLICY users_select_policy ON users
+    FOR SELECT TO authenticated
+    USING (
+        is_super_admin(current_app_user_id()) OR 
+        id = current_app_user_id() OR
+        has_permission(current_app_user_id(), 'user.view')
+    );
+
+CREATE POLICY roles_select_policy ON roles
+    FOR SELECT TO authenticated
+    USING (TRUE);
+
+CREATE POLICY permissions_select_policy ON permissions
+    FOR SELECT TO authenticated
+    USING (TRUE);
+
+CREATE POLICY user_roles_select_policy ON user_roles
+    FOR SELECT TO authenticated
+    USING (is_super_admin(current_app_user_id()) OR user_id = current_app_user_id());
+
+CREATE POLICY role_permissions_select_policy ON role_permissions
+    FOR SELECT TO authenticated
+    USING (TRUE);
+
+CREATE POLICY departments_select_policy ON departments
+    FOR SELECT TO authenticated
+    USING (TRUE);
+
+CREATE POLICY templates_select_policy ON templates
+    FOR SELECT TO authenticated
+    USING (TRUE);
+
+CREATE POLICY template_versions_select_policy ON template_versions
+    FOR SELECT TO authenticated
+    USING (TRUE);
+
+CREATE POLICY system_settings_select_policy ON system_settings
+    FOR SELECT TO authenticated
+    USING (is_super_admin(current_app_user_id()));
 
 -- Employees Table Policies
 CREATE POLICY employees_select_policy ON employees
@@ -395,20 +436,52 @@ CREATE POLICY salary_insert_update_policy ON employee_salary
         has_permission(current_app_user_id(), 'salary.update')
     );
 
--- Documents Table Policies
+-- Documents Table Policies (STRICT: Document-type isolation, employee.view cannot view salary slips)
 CREATE POLICY documents_select_policy ON documents
     FOR SELECT TO authenticated
     USING (
         is_super_admin(current_app_user_id()) OR
-        has_permission(current_app_user_id(), 'document.' || LOWER(SPLIT_PART(document_type::text, '_', 1)) || '.view') OR
-        has_permission(current_app_user_id(), 'employee.view')
+        (document_type = 'SALARY_SLIP' AND (
+            has_permission(current_app_user_id(), 'salary.view') OR 
+            has_permission(current_app_user_id(), 'document.salary.view')
+        )) OR
+        (document_type = 'OFFER_LETTER' AND has_permission(current_app_user_id(), 'document.offer.view')) OR
+        (document_type IN ('EXPERIENCE_LETTER', 'RELIEVING_LETTER') AND has_permission(current_app_user_id(), 'document.experience.view')) OR
+        (document_type = 'CERTIFICATE' AND has_permission(current_app_user_id(), 'document.certificate.view'))
     );
 
 CREATE POLICY documents_insert_policy ON documents
     FOR INSERT TO authenticated
     WITH CHECK (
         is_super_admin(current_app_user_id()) OR
-        has_permission(current_app_user_id(), 'document.' || LOWER(SPLIT_PART(document_type::text, '_', 1)) || '.create')
+        (document_type = 'SALARY_SLIP' AND has_permission(current_app_user_id(), 'document.salary.create')) OR
+        (document_type = 'OFFER_LETTER' AND has_permission(current_app_user_id(), 'document.offer.create')) OR
+        (document_type IN ('EXPERIENCE_LETTER', 'RELIEVING_LETTER') AND has_permission(current_app_user_id(), 'document.experience.create')) OR
+        (document_type = 'CERTIFICATE' AND has_permission(current_app_user_id(), 'document.certificate.create'))
+    );
+
+CREATE POLICY document_versions_select_policy ON document_versions
+    FOR SELECT TO authenticated
+    USING (
+        is_super_admin(current_app_user_id()) OR
+        EXISTS (
+            SELECT 1 FROM documents d 
+            WHERE d.id = document_versions.document_id 
+              AND (
+                (d.document_type = 'SALARY_SLIP' AND (has_permission(current_app_user_id(), 'salary.view') OR has_permission(current_app_user_id(), 'document.salary.view'))) OR
+                (d.document_type = 'OFFER_LETTER' AND has_permission(current_app_user_id(), 'document.offer.view')) OR
+                (d.document_type IN ('EXPERIENCE_LETTER', 'RELIEVING_LETTER') AND has_permission(current_app_user_id(), 'document.experience.view')) OR
+                (d.document_type = 'CERTIFICATE' AND has_permission(current_app_user_id(), 'document.certificate.view'))
+              )
+        )
+    );
+
+CREATE POLICY approvals_select_policy ON approvals
+    FOR SELECT TO authenticated
+    USING (
+        is_super_admin(current_app_user_id()) OR 
+        approver_id = current_app_user_id() OR
+        has_permission(current_app_user_id(), 'document.offer.approve')
     );
 
 -- Audit & Security Logs (Strict read-only for Authorized Audits)
@@ -548,7 +621,7 @@ INSERT INTO system_settings (key, value, description) VALUES
     "legal_entity": "Varsaka Labs Pvt. Ltd.",
     "website": "https://varsaka.com",
     "email": "info@varsakalabs.com",
-    "phone": "+91 8178988908",
+    "phone": "+91 40 6000 0000",
     "address": "APHB Colony, JV Colony, Indira Nagar, Gachibowli, Hyderabad, Telangana 500032",
     "signatory_title": "Authorized Signatory",
     "signatory_department": "HR Department"

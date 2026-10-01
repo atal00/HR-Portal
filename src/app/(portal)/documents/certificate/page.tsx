@@ -20,9 +20,9 @@ export default function GenerateCertificatePage() {
   const { register, handleSubmit, watch, setValue } = useForm<CertificateData>({
     defaultValues: {
       certificateType: 'INTERNSHIP_COMPLETION',
-      candidateName: 'Mr. Atal Kumar Pandey',
+      candidateName: 'Mr. Test Employee 001',
       projectTitle: 'Finance And Marketing Operations',
-      mentorName: 'Mr. Harsh Yadav',
+      mentorName: 'Manager Test',
       performanceGrade: 'Grade 78 (A / Outstanding)',
       tenureStartDate: '12 Jun, 2026',
       tenureEndDate: '12 Aug, 2026',
@@ -56,7 +56,7 @@ export default function GenerateCertificatePage() {
     const emp = employees.find((e) => e.id === empId);
     if (emp) {
       setValue('candidateName', `Mr./Ms. ${emp.full_name}`);
-      setValue('mentorName', emp.reporting_manager || 'Mr. Harsh Yadav');
+      setValue('mentorName', emp.reporting_manager || 'Manager Test');
       setValue('workLocation', emp.work_location);
     }
   };
@@ -68,7 +68,7 @@ export default function GenerateCertificatePage() {
     try {
       let empId = selectedEmpId;
       if (!empId) {
-        empId = employees[0]?.id || 'emp-atal-pandey-1083';
+        empId = employees[0]?.id || 'emp-test-001';
       }
 
       const res = await fetch('/api/documents', {
@@ -171,7 +171,7 @@ export default function GenerateCertificatePage() {
                 <label className="font-semibold text-slate-700 block mb-1">Candidate Name (Honorific)</label>
                 <input
                   {...register('candidateName', { required: true })}
-                  placeholder="Mr. Atal Kumar Pandey"
+                  placeholder="e.g. Mr. Test Employee"
                   className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-600"
                 />
               </div>

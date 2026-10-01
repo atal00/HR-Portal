@@ -82,7 +82,7 @@ async function runTestSuite() {
   // Create a document and revoke it
   const testDoc = await db.documents.create({
     document_type: 'CERTIFICATE',
-    employee_id: 'emp-atal-pandey-1083',
+    employee_id: 'emp-test-001',
     title: 'Test Certificate For Revocation QA',
     data_snapshot: { test: true },
     created_by: docAdmin.id,
@@ -153,7 +153,7 @@ async function runTestSuite() {
   // Scenario 12: Duplicate document numbers cannot be created (atomic sequence increments)
   const docNum1 = db.documents.create({
     document_type: 'OFFER_LETTER',
-    employee_id: 'emp-atal-pandey-1083',
+    employee_id: 'emp-test-001',
     title: 'Atomic Numbering Test 1',
     data_snapshot: {},
     created_by: hrAdmin.id,
@@ -161,7 +161,7 @@ async function runTestSuite() {
   });
   const docNum2 = db.documents.create({
     document_type: 'OFFER_LETTER',
-    employee_id: 'emp-atal-pandey-1083',
+    employee_id: 'emp-test-001',
     title: 'Atomic Numbering Test 2',
     data_snapshot: {},
     created_by: hrAdmin.id,

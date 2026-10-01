@@ -1,4 +1,5 @@
 import { localDb } from './storage/mock-db';
+import { isSupabaseConfigured, isProductionEnv } from './supabase';
 import { 
   Employee, 
   EmployeeSalary, 
@@ -15,12 +16,22 @@ import {
 } from '@/types/database';
 import { generateVerificationId } from './id-generator';
 
+function assertDatastoreMode() {
+  if (isProductionEnv() && !isSupabaseConfigured()) {
+    throw new Error(
+      'FATAL PRODUCTION SECURITY ERROR: Production deployment requires connected Supabase PostgreSQL instance. Silent fallback to local storage is blocked.'
+    );
+  }
+}
+
 export const db = {
   users: {
     async list(): Promise<User[]> {
+      assertDatastoreMode();
       return localDb.getState().users;
     },
     async getById(id: string): Promise<User | null> {
+      assertDatastoreMode();
       return localDb.getState().users.find((u) => u.id === id) || null;
     },
     async getByEmail(email: string): Promise<User | null> {

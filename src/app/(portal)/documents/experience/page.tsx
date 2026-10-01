@@ -20,7 +20,7 @@ export default function GenerateExperienceLetterPage() {
   const { register, handleSubmit, watch, setValue } = useForm<ExperienceLetterData>({
     defaultValues: {
       issueDate: new Date().toISOString().split('T')[0],
-      employeeName: 'Atal Kumar Pandey',
+      employeeName: 'Test Employee 001',
       employeeId: 'VL 1083',
       designation: 'Finance & Operations Analyst',
       department: 'Finance & Operations',
@@ -74,7 +74,7 @@ export default function GenerateExperienceLetterPage() {
       let empId = selectedEmpId;
       if (!empId) {
         const matched = employees.find((e) => e.employee_id === data.employeeId);
-        empId = matched ? matched.id : (employees[0]?.id || 'emp-atal-pandey-1083');
+        empId = matched ? matched.id : (employees[0]?.id || 'emp-test-001');
       }
 
       const res = await fetch('/api/documents', {

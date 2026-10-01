@@ -22,8 +22,8 @@ export default function GenerateOfferLetterPage() {
     defaultValues: {
       offerType: 'direct-fulltime',
       offerDate: new Date().toISOString().split('T')[0],
-      candidateName: 'Atal Kumar Pandey',
-      candidateAddress: `Ward No 02, Chhawani,\nBanuchhapar, Sant Kabir Road,\nPO Banuchhapar, Dist :- West Champaran,\nBihar- 845438`,
+      candidateName: 'Test Employee 001',
+      candidateAddress: 'Plot 1, Block A, Financial District, Hyderabad, Telangana 500032',
       designation: 'Finance & Operations Analyst',
       department: 'Finance & Operations',
       joiningDate: new Date().toISOString().split('T')[0],
@@ -107,7 +107,7 @@ export default function GenerateOfferLetterPage() {
       let empId = selectedEmpId;
       if (!empId) {
         const matched = employees.find((e) => e.employee_id === data.employeeCode);
-        empId = matched ? matched.id : (employees[0]?.id || 'emp-atal-pandey-1083');
+        empId = matched ? matched.id : (employees[0]?.id || 'emp-test-001');
       }
 
       const res = await fetch('/api/documents', {

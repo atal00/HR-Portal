@@ -46,13 +46,22 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   }
 }
 
+export class AuthError extends Error {
+  status: number;
+  constructor(message: string = 'UNAUTHORIZED: Authentication session required.', status: number = 401) {
+    super(message);
+    this.status = status;
+    this.name = 'AuthError';
+  }
+}
+
 /**
  * Server-side guard requiring authentication
  */
 export async function requireAuthUser(): Promise<SessionUser> {
   const user = await getCurrentUser();
   if (!user) {
-    throw new Error('UNAUTHORIZED: Authentication session required.');
+    throw new AuthError('UNAUTHORIZED: Authentication session required.', 401);
   }
   return user;
 }

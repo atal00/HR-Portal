@@ -14,10 +14,28 @@ export async function GET(req: NextRequest) {
     const employeeId = searchParams.get('employeeId') || undefined;
     const search = searchParams.get('search') || undefined;
 
+    // Permission check for salary documents
+    const canViewSalary = hasPermission(user, 'salary.view') || hasPermission(user, 'document.salary.view') || user.role === 'SUPER_ADMIN';
+
+    // If specifically requesting SALARY_SLIP type and lacks permission -> 403 Forbidden
+    if (type === 'SALARY_SLIP' && !canViewSalary) {
+      await logSecurityEvent({
+        eventType: 'UNAUTHORIZED_ACCESS',
+        severity: 'HIGH',
+        description: `User ${user.email} (${user.role}) denied listing SALARY_SLIP documents`,
+        userId: user.id,
+      });
+      return NextResponse.json({ error: 'Forbidden. Missing required permission: salary.view' }, { status: 403 });
+    }
+
     const list = await db.documents.list({ type, status, employeeId, search });
-    return NextResponse.json(list);
+
+    // Non-payroll users must NOT receive SALARY_SLIP records at all
+    const filteredList = canViewSalary ? list : list.filter((d) => d.document_type !== 'SALARY_SLIP');
+
+    return NextResponse.json(filteredList);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: error.status || 500 });
   }
 }
 

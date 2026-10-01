@@ -28,7 +28,7 @@ export default function GenerateSalarySlipPage() {
       month: 'September',
       year: 2026,
       employeeId: 'VL 1083',
-      employeeName: 'Atal Kumar Pandey',
+      employeeName: 'Test Employee 001',
       designation: 'Finance & Operations Analyst',
       department: 'Finance & Operations',
       joiningDate: '2025-12-01',
@@ -119,7 +119,7 @@ export default function GenerateSalarySlipPage() {
       let empId = selectedEmpId;
       if (!empId) {
         const matched = employees.find((e) => e.employee_id === data.employeeId);
-        empId = matched ? matched.id : (employees[0]?.id || 'emp-atal-pandey-1083');
+        empId = matched ? matched.id : (employees[0]?.id || 'emp-test-001');
       }
 
       const res = await fetch('/api/documents', {

@@ -69,6 +69,21 @@ export const SecurityTelemetryView: React.FC<Props> = ({ logs }) => {
     });
   }, [logs, severityFilter, eventTypeFilter, dateRangeFilter, searchQuery]);
 
+  // Live security telemetry metric calculations
+  const metrics = useMemo(() => {
+    const total = logs.length;
+    const highOrCritical = logs.filter((l) => l.severity === 'HIGH' || l.severity === 'CRITICAL').length;
+    const blockedAttempts = logs.filter(
+      (l) =>
+        l.event_type === 'RATE_LIMIT_EXCEEDED' ||
+        l.event_type === 'EXPIRED_OR_FORGED_DOWNLOAD_TOKEN' ||
+        l.event_type === 'UNAUTHORIZED_ACCESS'
+    ).length;
+    const passRate = total > 0 ? Math.max(0, Math.round(((total - highOrCritical) / total) * 100)) : 100;
+    const status = highOrCritical > 3 ? 'ALERT' : highOrCritical > 0 ? 'MONITORED' : 'OPTIMAL';
+    return { total, highOrCritical, blockedAttempts, passRate, status };
+  }, [logs]);
+
   const getSeverityBadge = (severity: string) => {
     switch (severity) {
       case 'CRITICAL':
@@ -157,13 +172,19 @@ export const SecurityTelemetryView: React.FC<Props> = ({ logs }) => {
               </div>
             </div>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-black text-slate-900 tracking-tight">OPTIMAL</span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
-                100% Pass
+              <span className={`text-2xl font-black tracking-tight ${
+                metrics.status === 'OPTIMAL' ? 'text-slate-900' : metrics.status === 'MONITORED' ? 'text-amber-600' : 'text-rose-600'
+              }`}>
+                {metrics.status}
+              </span>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                metrics.passRate >= 90 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+              }`}>
+                {metrics.passRate}% Safe
               </span>
             </div>
             <p className="text-[11px] text-slate-500 mt-1">
-              Strict CSP, RLS &amp; TLS 1.3 enforced
+              Calculated from {metrics.total} live security events
             </p>
           </div>
 
@@ -176,53 +197,55 @@ export const SecurityTelemetryView: React.FC<Props> = ({ logs }) => {
               </div>
             </div>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-black text-slate-900 tracking-tight">5 Active</span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800">
+              <span className="text-2xl font-black text-slate-900 tracking-tight">Stateless</span>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
                 JWT Guard
               </span>
             </div>
             <p className="text-[11px] text-slate-500 mt-1">
-              Enterprise authenticated tokens
+              HttpOnly client token (no central session table)
             </p>
           </div>
 
           {/* Card 3: Failed Attempts */}
           <div className="bg-white rounded-xl border border-slate-200/90 p-4.5 shadow-xs hover:border-slate-300 transition">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500">Failed Attempts</span>
+              <span className="text-xs font-semibold text-slate-500">Security Blocks</span>
               <div className="h-8 w-8 rounded-lg bg-amber-50 border border-amber-200/70 flex items-center justify-center">
                 <AlertTriangle className="h-4 w-4 text-amber-600" />
               </div>
             </div>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-black text-slate-900 tracking-tight">0 Blocked</span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
-                Zero Breaches
+              <span className="text-2xl font-black text-slate-900 tracking-tight">{metrics.blockedAttempts} Blocked</span>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                metrics.highOrCritical === 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+              }`}>
+                {metrics.highOrCritical} Alerts
               </span>
             </div>
             <p className="text-[11px] text-slate-500 mt-1">
-              No anomalies detected in last 24h
+              Rate limits &amp; unauthorized access rejections
             </p>
           </div>
 
           {/* Card 4: Recent Security Events */}
           <div className="bg-white rounded-xl border border-slate-200/90 p-4.5 shadow-xs hover:border-slate-300 transition">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500">Recent Security Events</span>
+              <span className="text-xs font-semibold text-slate-500">Security Log Stream</span>
               <div className="h-8 w-8 rounded-lg bg-indigo-50 border border-indigo-200/70 flex items-center justify-center">
                 <Activity className="h-4 w-4 text-indigo-600" />
               </div>
             </div>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="text-2xl font-black text-slate-900 tracking-tight">
-                {logs.length} Events
+                {metrics.total} Events
               </span>
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">
-                Audited
+                Live Log
               </span>
             </div>
             <p className="text-[11px] text-slate-500 mt-1">
-              Tamper-evident audit baseline
+              Logged to persistent audit store
             </p>
           </div>
         </div>

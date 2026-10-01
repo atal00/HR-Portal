@@ -165,7 +165,7 @@ export default function NewEmployeePage() {
               <label className="font-semibold text-slate-700 block mb-1">Full Legal Name *</label>
               <input
                 {...register('full_name', { required: true })}
-                placeholder="e.g. Atal Kumar Pandey"
+                placeholder="e.g. Test Employee"
                 className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600"
               />
             </div>

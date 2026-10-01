@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
     const list = await db.employees.list({ search, status, departmentId });
     return NextResponse.json(list);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: error.status || 500 });
   }
 }
 

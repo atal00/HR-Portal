@@ -381,7 +381,7 @@ The automated test runner (`tests/qa-verification.ts`) evaluated all 12 system t
 Validated using autonomous browser subagent on active Next.js Turbopack dev server:
 - **Authentication**: Login interface verified with Varsaka branding. One-click role switcher successfully sets authenticated session.
 - **Executive Dashboard**: KPI counters (Headcount: 3, Active: 3, Documents: 6, Pending: 3), quick action shortcuts, and recent activity stream confirmed.
-- **Employee Directory & Profile**: Navigated to Atal Kumar Pandey (`VL 1083`). Overview, Compensation, Document History, and Audit Trail tabs verified.
+- **Employee Directory & Profile**: Navigated to Test Employee 001 (`VL 1083`). Overview, Compensation, Document History, and Audit Trail tabs verified.
 - **Document Creation & Review**: Created new Certificate (`doc-1790790489035-lcpq`) with token `VVR-CERT-E91F839B`. Verified preview and pending approval status.
 - **Live Verification**: Loaded `/verify/VVR-CERT-7B9A2F` in browser. Verified official green badge and confirmed zero sensitive financial data leakage.
 - **Audit & Security Views**: Confirmed audit entries at `/audit-logs` and security events at `/security`.
