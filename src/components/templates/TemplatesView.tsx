@@ -27,6 +27,8 @@ export const TemplatesView: React.FC<Props> = ({ templates }) => {
         return <FileText className="h-5 w-5 text-blue-600" />;
       case 'EXPERIENCE_LETTER':
         return <FileSpreadsheet className="h-5 w-5 text-indigo-600" />;
+      case 'RELIEVING_LETTER':
+        return <FileSpreadsheet className="h-5 w-5 text-purple-600" />;
       case 'SALARY_SLIP':
         return <Banknote className="h-5 w-5 text-emerald-600" />;
       case 'CERTIFICATE':

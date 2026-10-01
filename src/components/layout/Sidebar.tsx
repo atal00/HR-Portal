@@ -70,6 +70,13 @@ export const Sidebar: React.FC<Props> = ({ user }) => {
       indent: true,
     },
     {
+      label: 'Relieving Letters',
+      href: '/documents/relieving',
+      icon: FileSpreadsheet,
+      show: hasPermission(user, 'document.relieving.view'),
+      indent: true,
+    },
+    {
       label: 'Salary Slips',
       href: '/documents/salary',
       icon: Banknote,

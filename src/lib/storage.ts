@@ -8,6 +8,7 @@ const STORAGE_ROOT = path.join(process.cwd(), 'storage', 'documents');
 const SUBFOLDERS: Record<DocumentType, string> = {
   OFFER_LETTER: 'offer',
   EXPERIENCE_LETTER: 'experience',
+  RELIEVING_LETTER: 'relieving',
   SALARY_SLIP: 'salary',
   CERTIFICATE: 'certificate',
 };

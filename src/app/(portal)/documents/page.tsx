@@ -127,6 +127,7 @@ export default function DocumentsPage() {
               <option value="ALL">All Types</option>
               <option value="OFFER_LETTER">Offer Letter</option>
               <option value="EXPERIENCE_LETTER">Experience Letter</option>
+              <option value="RELIEVING_LETTER">Relieving Letter</option>
               <option value="SALARY_SLIP">Salary Slip</option>
               <option value="CERTIFICATE">Certificate</option>
             </select>

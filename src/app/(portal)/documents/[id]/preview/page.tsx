@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { DocumentRecord } from '@/types/database';
 import { OfferLetterTemplate } from '@/components/documents/OfferLetterTemplate';
 import { ExperienceLetterTemplate } from '@/components/documents/ExperienceLetterTemplate';
+import { RelievingLetterTemplate } from '@/components/documents/RelievingLetterTemplate';
 import { SalarySlipTemplate } from '@/components/documents/SalarySlipTemplate';
 import { CertificateTemplate } from '@/components/documents/CertificateTemplate';
 import { ArrowLeft, Printer } from 'lucide-react';
@@ -53,6 +54,15 @@ export default function DocumentPreviewPage() {
       case 'EXPERIENCE_LETTER':
         return (
           <ExperienceLetterTemplate
+            data={doc.data_snapshot as any}
+            documentNumber={doc.document_number}
+            verificationId={doc.verification_id}
+            verificationUrl={verificationUrl}
+          />
+        );
+      case 'RELIEVING_LETTER':
+        return (
+          <RelievingLetterTemplate
             data={doc.data_snapshot as any}
             documentNumber={doc.document_number}
             verificationId={doc.verification_id}

@@ -7,6 +7,7 @@ import { DocumentRecord } from '@/types/database';
 import { formatDate } from '@/lib/utils';
 import { OfferLetterTemplate } from '@/components/documents/OfferLetterTemplate';
 import { ExperienceLetterTemplate } from '@/components/documents/ExperienceLetterTemplate';
+import { RelievingLetterTemplate } from '@/components/documents/RelievingLetterTemplate';
 import { SalarySlipTemplate } from '@/components/documents/SalarySlipTemplate';
 import { CertificateTemplate } from '@/components/documents/CertificateTemplate';
 import {
@@ -172,6 +173,15 @@ export default function DocumentDetailsPage() {
       case 'EXPERIENCE_LETTER':
         return (
           <ExperienceLetterTemplate
+            data={doc.data_snapshot as any}
+            documentNumber={doc.document_number}
+            verificationId={doc.verification_id}
+            verificationUrl={verificationUrl}
+          />
+        );
+      case 'RELIEVING_LETTER':
+        return (
+          <RelievingLetterTemplate
             data={doc.data_snapshot as any}
             documentNumber={doc.document_number}
             verificationId={doc.verification_id}

@@ -133,7 +133,7 @@ export default async function DashboardPage() {
           <span className="text-xs text-slate-500">Controlled templates with database integrity</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
           
           <Link
             href="/documents/offer"
@@ -165,14 +165,35 @@ export default async function DashboardPage() {
                 <FileSpreadsheet className="h-5 w-5" />
               </div>
               <h3 className="font-bold text-sm text-slate-900 group-hover:text-indigo-600 transition">
-                Experience Letter
+                Experience Certificate
               </h3>
               <p className="text-xs text-slate-500 mt-1 line-clamp-2">
-                Official relieving certificate with service tenure, designation, and conduct appreciation.
+                Official certificate with service tenure, designation, and conduct appreciation.
               </p>
             </div>
             <div className="mt-4 flex items-center gap-1 text-xs font-bold text-indigo-600 group-hover:translate-x-0.5 transition">
-              <span>Generate Letter</span>
+              <span>Generate Certificate</span>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </div>
+          </Link>
+
+          <Link
+            href="/documents/relieving"
+            className="group bg-white p-5 rounded-xl border border-slate-200 hover:border-purple-500 hover:shadow-md transition flex flex-col justify-between"
+          >
+            <div>
+              <div className="p-2.5 bg-purple-50 text-purple-600 rounded-lg inline-block mb-3 group-hover:scale-105 transition">
+                <FileSpreadsheet className="h-5 w-5" />
+              </div>
+              <h3 className="font-bold text-sm text-slate-900 group-hover:text-purple-600 transition">
+                Relieving Letter
+              </h3>
+              <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                Official separation order with relieving date, clearance status, and handover verification.
+              </p>
+            </div>
+            <div className="mt-4 flex items-center gap-1 text-xs font-bold text-purple-600 group-hover:translate-x-0.5 transition">
+              <span>Generate Relieving</span>
               <ChevronRight className="h-3.5 w-3.5" />
             </div>
           </Link>

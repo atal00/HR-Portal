@@ -37,6 +37,8 @@ export async function GET(
         return NextResponse.json({ error: 'Forbidden. Missing required permission: document.offer.view' }, { status: 403 });
       } else if (doc.document_type === 'EXPERIENCE_LETTER' && !hasPermission(user, 'document.experience.view')) {
         return NextResponse.json({ error: 'Forbidden. Missing required permission: document.experience.view' }, { status: 403 });
+      } else if (doc.document_type === 'RELIEVING_LETTER' && !hasPermission(user, 'document.relieving.view')) {
+        return NextResponse.json({ error: 'Forbidden. Missing required permission: document.relieving.view' }, { status: 403 });
       } else if (doc.document_type === 'CERTIFICATE' && !hasPermission(user, 'document.certificate.view')) {
         return NextResponse.json({ error: 'Forbidden. Missing required permission: document.certificate.view' }, { status: 403 });
       }

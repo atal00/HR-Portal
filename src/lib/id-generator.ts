@@ -7,6 +7,8 @@ export function getDocumentPrefix(type: DocumentType): string {
       return 'VAR-OFF';
     case 'EXPERIENCE_LETTER':
       return 'VAR-EXP';
+    case 'RELIEVING_LETTER':
+      return 'VAR-REL';
     case 'SALARY_SLIP':
       return 'VAR-SAL';
     case 'CERTIFICATE':
@@ -34,10 +36,10 @@ export function formatDocumentNumber(type: DocumentType, sequence: number, date:
 
 /**
  * Generates an unguessable, cryptographically secure Verification ID
- * Example: VVR-CERT-7B9A2E
+ * Example: VVR-CERT-7B9A2E, VVR-REL-7B9A2E
  */
 export function generateVerificationId(type: DocumentType): string {
-  const typeShort = type.substring(0, 4);
+  const typeShort = type === 'RELIEVING_LETTER' ? 'REL' : type.substring(0, 4);
   const randomHex = crypto.randomBytes(4).toString('hex').toUpperCase();
   return `VVR-${typeShort}-${randomHex}`;
 }

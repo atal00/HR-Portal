@@ -9,15 +9,26 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     'document.offer.create',
     'document.offer.view',
     'document.offer.download',
+    'document.offer.approve',
     'document.experience.create',
     'document.experience.view',
     'document.experience.download',
+    'document.experience.approve',
+    'document.relieving.create',
+    'document.relieving.view',
+    'document.relieving.download',
+    'document.relieving.approve',
     'document.salary.create',
     'document.salary.view',
     'document.salary.download',
+    'document.salary.approve',
     'document.certificate.create',
     'document.certificate.view',
     'document.certificate.download',
+    'document.certificate.approve',
+    'document.approve',
+    'document.reject',
+    'document.revoke',
     'template.create',
     'template.update',
     'template.publish',
@@ -38,12 +49,22 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     'document.offer.create',
     'document.offer.view',
     'document.offer.download',
+    'document.offer.approve',
     'document.experience.create',
     'document.experience.view',
     'document.experience.download',
+    'document.experience.approve',
+    'document.relieving.create',
+    'document.relieving.view',
+    'document.relieving.download',
+    'document.relieving.approve',
     'document.certificate.create',
     'document.certificate.view',
     'document.certificate.download',
+    'document.certificate.approve',
+    'document.approve',
+    'document.reject',
+    'document.revoke',
   ],
 
   DOCUMENT_ADMIN: [
@@ -51,12 +72,21 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     'document.offer.create',
     'document.offer.view',
     'document.offer.download',
+    'document.offer.approve',
     'document.experience.create',
     'document.experience.view',
     'document.experience.download',
+    'document.experience.approve',
+    'document.relieving.create',
+    'document.relieving.view',
+    'document.relieving.download',
+    'document.relieving.approve',
     'document.certificate.create',
     'document.certificate.view',
     'document.certificate.download',
+    'document.certificate.approve',
+    'document.approve',
+    'document.reject',
     'template.create',
     'template.update',
     'template.publish',
@@ -69,12 +99,14 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     'document.salary.create',
     'document.salary.view',
     'document.salary.download',
+    'document.salary.approve',
   ],
 
   VIEWER: [
     'employee.view',
     'document.offer.view',
     'document.experience.view',
+    'document.relieving.view',
     'document.certificate.view',
   ],
 };
@@ -87,7 +119,7 @@ export const ROLE_LABELS: Record<RoleCode, { name: string; description: string; 
   },
   HR_ADMIN: {
     name: 'HR Administrator',
-    description: 'Manages employees, offers, and experience letters',
+    description: 'Manages employees, offers, experience, and relieving letters',
     badgeColor: 'bg-blue-100 text-blue-800 border-blue-200',
   },
   DOCUMENT_ADMIN: {
@@ -138,10 +170,17 @@ export function canModifySalary(user: SessionUser | null | undefined): boolean {
 
 export function canRevokeDocument(user: SessionUser | null | undefined): boolean {
   if (!user) return false;
-  return user.role === 'SUPER_ADMIN' || user.role === 'HR_ADMIN';
+  if (user.role === 'SUPER_ADMIN') return true;
+  return hasPermission(user, 'document.revoke');
 }
 
-export function canApproveDocument(user: SessionUser | null | undefined): boolean {
+export function canApproveDocument(user: SessionUser | null | undefined, documentType?: string): boolean {
   if (!user) return false;
-  return user.role === 'SUPER_ADMIN' || user.role === 'HR_ADMIN' || user.role === 'DOCUMENT_ADMIN';
+  if (user.role === 'SUPER_ADMIN') return true;
+  if (hasPermission(user, 'document.approve')) return true;
+  if (documentType) {
+    const specificPerm = `document.${documentType.toLowerCase().split('_')[0]}.approve` as PermissionCode;
+    return hasPermission(user, specificPerm);
+  }
+  return false;
 }

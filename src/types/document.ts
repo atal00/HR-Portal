@@ -56,6 +56,23 @@ export interface ExperienceLetterData {
   authorizedSignatoryTitle: string;
 }
 
+export interface RelievingLetterData {
+  issueDate: string;
+  employeeName: string;
+  employeeId: string;
+  designation: string;
+  department: string;
+  joiningDate: string;
+  lastWorkingDate: string;
+  employmentType: string;
+  workLocation: string;
+  resignationDate?: string;
+  relievingDate: string;
+  clearanceStatus: string;
+  authorizedSignatoryName: string;
+  authorizedSignatoryTitle: string;
+}
+
 export interface SalarySlipData {
   month: string; // e.g. "September"
   year: number;  // e.g. 2026

@@ -32,6 +32,12 @@ function checkDocumentDownloadPermission(user: any, doc: any): { allowed: boolea
       }
       return { allowed: false, requiredPermission: 'document.experience.download' };
 
+    case 'RELIEVING_LETTER':
+      if (hasPermission(user, 'document.relieving.download')) {
+        return { allowed: true, requiredPermission: 'document.relieving.download' };
+      }
+      return { allowed: false, requiredPermission: 'document.relieving.download' };
+
     case 'CERTIFICATE':
       if (hasPermission(user, 'document.certificate.download')) {
         return { allowed: true, requiredPermission: 'document.certificate.download' };
