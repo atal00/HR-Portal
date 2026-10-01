@@ -31,3 +31,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local system and storage data (contains local runtime state)
+.system_data/
+*.db_store.json
