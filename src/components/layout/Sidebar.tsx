@@ -18,7 +18,8 @@ import {
   ShieldCheck,
   Award,
   Layers,
-  FileSpreadsheet
+  FileSpreadsheet,
+  CornerDownRight,
 } from 'lucide-react';
 
 interface Props {
@@ -49,7 +50,7 @@ export const Sidebar: React.FC<Props> = ({ user }) => {
       badge: 'Confidential',
     },
     {
-      label: 'All Documents',
+      label: 'Documents',
       href: '/documents',
       icon: FileText,
       show: true,
@@ -127,53 +128,71 @@ export const Sidebar: React.FC<Props> = ({ user }) => {
   ];
 
   return (
-    <aside className="w-64 border-r border-slate-200 bg-white min-h-[calc(100vh-4rem)] p-4 flex flex-col justify-between shrink-0 shadow-xs">
+    <aside className="w-64 border-r border-slate-200/90 bg-white min-h-[calc(100vh-4rem)] p-3.5 flex flex-col justify-between shrink-0 shadow-xs">
       <div className="space-y-1">
-        <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-          Core Navigation
+        <div className="px-3 pb-2 pt-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+          Navigation
         </div>
 
-        {navItems
-          .filter((item) => item.show)
-          .map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href) && item.href !== '/documents');
+        <nav className="space-y-0.5">
+          {navItems
+            .filter((item) => item.show)
+            .map((item) => {
+              const Icon = item.icon;
+              const isActive =
+                pathname === item.href ||
+                (item.href !== '/dashboard' &&
+                  pathname.startsWith(item.href) &&
+                  item.href !== '/documents');
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition ${
-                  item.indent ? 'ml-4 py-1.5' : ''
-                } ${
-                  isActive
-                    ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                    : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <Icon className={`h-4 w-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                  <span>{item.label}</span>
-                </div>
-                {item.badge && !isActive && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold uppercase">
-                    {item.badge}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition group ${
+                    item.indent ? 'ml-3 pl-3 py-1.5 text-[11.5px] border-l border-slate-200' : ''
+                  } ${
+                    isActive
+                      ? 'bg-blue-600 text-white font-semibold shadow-xs'
+                      : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {item.indent ? (
+                      <CornerDownRight
+                        className={`h-3 w-3 shrink-0 ${
+                          isActive ? 'text-blue-100' : 'text-slate-400 group-hover:text-slate-600'
+                        }`}
+                      />
+                    ) : (
+                      <Icon
+                        className={`h-4 w-4 shrink-0 ${
+                          isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'
+                        }`}
+                      />
+                    )}
+                    <span className="truncate">{item.label}</span>
+                  </div>
+                  {item.badge && !isActive && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold uppercase tracking-wider shrink-0">
+                      {item.badge}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+        </nav>
       </div>
 
       {/* Sidebar Footer - Security Badge */}
-      <div className="pt-4 border-t border-slate-200">
-        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs">
+      <div className="pt-3 border-t border-slate-200 mt-6 pb-6">
+        <div className="bg-slate-50/80 border border-slate-200/90 rounded-xl p-3 text-xs shadow-2xs">
           <div className="flex items-center gap-2 text-slate-800 font-semibold mb-1">
             <ShieldCheck className="h-4 w-4 text-blue-600 shrink-0" />
-            <span>Varsaka Security Shield</span>
+            <span className="text-xs font-bold text-slate-900">Varsaka Security Shield</span>
           </div>
-          <p className="text-[10px] text-slate-500 leading-normal">
-            Server-side RBAC & RLS active. Tamper-evident immutable audit logging enabled.
+          <p className="text-[10.5px] text-slate-500 leading-relaxed">
+            Strict RBAC &amp; RLS enforced. Tamper-evident immutable audit logging active.
           </p>
         </div>
       </div>

@@ -26,7 +26,14 @@ export const CertificateTemplate: React.FC<Props> = ({
           <div>
             <div className="flex items-center justify-between border-b border-amber-500/30 pb-4 mb-6">
               <div className="flex items-center gap-3">
-                <img src="/brand/varsaka-logo.png" alt="Varsaka Labs" className="h-16 w-auto object-contain" />
+                <img 
+                  src="/brand/varsaka-logo.png" 
+                  alt="Varsaka Labs" 
+                  width={64}
+                  height={64}
+                  style={{ height: '64px', width: 'auto', maxHeight: '64px' }}
+                  className="h-16 w-auto object-contain shrink-0" 
+                />
                 <div>
                   <h1 className="text-2xl font-black text-blue-950 tracking-wider cert-font-cinzel">VARSAKA LABS</h1>
                   <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest">
@@ -98,7 +105,14 @@ export const CertificateTemplate: React.FC<Props> = ({
             {/* Signature Block */}
             <div className="text-left w-56">
               <div className="h-14 flex items-center">
-                <img src="/brand/sign.jpeg" alt="Sign" className="h-12 w-auto opacity-85" />
+                <img 
+                  src="/brand/sign.jpeg" 
+                  alt="Sign" 
+                  width={120} 
+                  height={48} 
+                  style={{ height: '48px', width: 'auto', maxHeight: '48px' }} 
+                  className="h-12 w-auto opacity-85" 
+                />
               </div>
               <div className="border-t border-slate-900 pt-1">
                 <div className="text-xs font-bold text-blue-950 uppercase">{data.authorizedSignatory || 'Authorized Signatory'}</div>
@@ -109,7 +123,14 @@ export const CertificateTemplate: React.FC<Props> = ({
 
             {/* Official Seal Center */}
             <div className="flex flex-col items-center">
-              <img src="/brand/varsaka-seal.png" alt="Official Seal" className="h-24 w-auto object-contain opacity-95 drop-shadow-xs" />
+              <img 
+                src="/brand/varsaka-seal.png" 
+                alt="Official Seal" 
+                width={96} 
+                height={96} 
+                style={{ height: '96px', width: 'auto', maxHeight: '96px' }} 
+                className="h-24 w-auto object-contain opacity-95 drop-shadow-xs shrink-0" 
+              />
               <span className="text-[9px] uppercase tracking-widest text-amber-800 font-bold mt-1">Official Corporate Seal</span>
             </div>
 

@@ -32,7 +32,16 @@ export default async function PublicVerificationPage({ params }: Props) {
         {/* Brand Header */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-3 justify-center mb-2">
-            <img src="/brand/varsaka-logo.png" alt="Varsaka Labs" className="h-12 w-auto object-contain" />
+            <div className="h-12 w-12 rounded-xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center p-1 shrink-0 overflow-hidden">
+              <img 
+                src="/brand/varsaka-logo.png" 
+                alt="Varsaka Labs" 
+                width={40} 
+                height={40} 
+                style={{ height: '36px', width: '36px', objectFit: 'contain' }}
+                className="h-9 w-9 object-contain" 
+              />
+            </div>
             <div className="text-left">
               <span className="text-2xl font-black text-blue-950 tracking-wider block">VARSAKA LABS</span>
               <span className="text-[10px] text-blue-700 uppercase tracking-widest font-bold block">

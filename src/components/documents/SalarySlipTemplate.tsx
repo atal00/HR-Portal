@@ -24,7 +24,14 @@ export const SalarySlipTemplate: React.FC<Props> = ({
         <div className="border-b-2 border-blue-900 pb-4 mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <img src="/brand/varsaka-logo.png" alt="Varsaka Labs" className="h-14 w-auto object-contain" />
+              <img 
+                src="/brand/varsaka-logo.png" 
+                alt="Varsaka Labs" 
+                width={56}
+                height={56}
+                style={{ height: '56px', width: 'auto', maxHeight: '56px' }}
+                className="h-14 w-auto object-contain shrink-0" 
+              />
               <div>
                 <h1 className="text-xl font-black text-blue-950 tracking-wider">VARSAKA LABS PVT. LTD.</h1>
                 <p className="text-xs text-slate-600">APHB Colony, JV Colony, Indira Nagar, Gachibowli, Hyderabad, Telangana 500032</p>

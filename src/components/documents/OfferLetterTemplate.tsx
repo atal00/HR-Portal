@@ -29,7 +29,14 @@ export const OfferLetterTemplate: React.FC<Props> = ({
           {/* Header */}
           <div className="flex items-center justify-between border-b-2 border-blue-900 pb-4 mb-6">
             <div className="flex items-center gap-4">
-              <img src="/brand/varsaka-logo.png" alt="Varsaka Labs" className="h-16 w-auto object-contain" />
+              <img 
+                src="/brand/varsaka-logo.png" 
+                alt="Varsaka Labs" 
+                width={64}
+                height={64}
+                style={{ height: '64px', width: 'auto', maxHeight: '64px' }}
+                className="h-16 w-auto object-contain shrink-0" 
+              />
               <div>
                 <h1 className="text-2xl font-black text-blue-950 tracking-wider">VARSAKA LABS</h1>
                 <p className="text-xs font-semibold text-blue-700 uppercase tracking-widest">
@@ -118,7 +125,14 @@ export const OfferLetterTemplate: React.FC<Props> = ({
       <div className="min-h-[1120px] p-12 flex flex-col justify-between border-b border-slate-200 print:border-none page-break-after">
         <div>
           <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-6">
-            <img src="/brand/varsaka-logo.png" alt="Varsaka Labs" className="h-10 w-auto" />
+            <img 
+              src="/brand/varsaka-logo.png" 
+              alt="Varsaka Labs" 
+              width={40}
+              height={40}
+              style={{ height: '40px', width: 'auto', maxHeight: '40px' }}
+              className="h-10 w-auto object-contain shrink-0" 
+            />
             <span className="text-xs font-mono text-slate-400">{documentNumber}</span>
           </div>
 
@@ -151,7 +165,14 @@ export const OfferLetterTemplate: React.FC<Props> = ({
             <div className="pt-16 flex items-end justify-between">
               <div className="w-64 border-t border-slate-900 pt-2 text-xs">
                 <div className="h-12 flex items-center">
-                  <img src="/brand/sign.jpeg" alt="Sign" className="h-10 w-auto opacity-80" />
+                  <img 
+                    src="/brand/sign.jpeg" 
+                    alt="Sign" 
+                    width={100}
+                    height={40}
+                    style={{ height: '40px', width: 'auto', maxHeight: '40px' }}
+                    className="h-10 w-auto opacity-80" 
+                  />
                 </div>
                 <div className="font-bold text-blue-950 uppercase tracking-wide">Authorized Signatory</div>
                 <div className="text-slate-600">Varsaka Labs Pvt. Ltd.</div>
@@ -180,7 +201,14 @@ export const OfferLetterTemplate: React.FC<Props> = ({
       <div className="min-h-[1120px] p-12 flex flex-col justify-between border-b border-slate-200 print:border-none page-break-after">
         <div>
           <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
-            <img src="/brand/varsaka-logo.png" alt="Varsaka Labs" className="h-10 w-auto" />
+            <img 
+              src="/brand/varsaka-logo.png" 
+              alt="Varsaka Labs" 
+              width={40} 
+              height={40} 
+              style={{ height: '40px', width: 'auto', maxHeight: '40px' }} 
+              className="h-10 w-auto object-contain shrink-0" 
+            />
             <span className="text-xs font-mono text-slate-400">{documentNumber}</span>
           </div>
 
@@ -289,7 +317,14 @@ export const OfferLetterTemplate: React.FC<Props> = ({
       <div className="min-h-[1120px] p-12 flex flex-col justify-between border-b border-slate-200 print:border-none page-break-after">
         <div>
           <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
-            <img src="/brand/varsaka-logo.png" alt="Varsaka Labs" className="h-10 w-auto" />
+            <img 
+              src="/brand/varsaka-logo.png" 
+              alt="Varsaka Labs" 
+              width={40} 
+              height={40} 
+              style={{ height: '40px', width: 'auto', maxHeight: '40px' }} 
+              className="h-10 w-auto object-contain shrink-0" 
+            />
             <span className="text-xs font-mono text-slate-400">{documentNumber}</span>
           </div>
 
@@ -604,7 +639,14 @@ export const OfferLetterTemplate: React.FC<Props> = ({
       <div className="min-h-[1120px] p-12 flex flex-col justify-between border-b border-slate-200 print:border-none page-break-after">
         <div>
           <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
-            <img src="/brand/varsaka-logo.png" alt="Varsaka Labs" className="h-10 w-auto" />
+            <img 
+              src="/brand/varsaka-logo.png" 
+              alt="Varsaka Labs" 
+              width={40} 
+              height={40} 
+              style={{ height: '40px', width: 'auto', maxHeight: '40px' }} 
+              className="h-10 w-auto object-contain shrink-0" 
+            />
             <span className="text-xs font-mono text-slate-400">{documentNumber}</span>
           </div>
 
@@ -645,7 +687,14 @@ export const OfferLetterTemplate: React.FC<Props> = ({
       <div className="min-h-[1120px] p-12 flex flex-col justify-between print:border-none">
         <div>
           <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
-            <img src="/brand/varsaka-logo.png" alt="Varsaka Labs" className="h-10 w-auto" />
+            <img 
+              src="/brand/varsaka-logo.png" 
+              alt="Varsaka Labs" 
+              width={40} 
+              height={40} 
+              style={{ height: '40px', width: 'auto', maxHeight: '40px' }} 
+              className="h-10 w-auto object-contain shrink-0" 
+            />
             <div className="text-right">
               <span className="text-xs font-mono font-bold text-blue-900">{documentNumber}</span>
             </div>

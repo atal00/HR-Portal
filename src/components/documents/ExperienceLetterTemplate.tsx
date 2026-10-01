@@ -23,7 +23,14 @@ export const ExperienceLetterTemplate: React.FC<Props> = ({
       <div>
         <div className="flex items-center justify-between border-b-2 border-blue-900 pb-5 mb-8">
           <div className="flex items-center gap-4">
-            <img src="/brand/varsaka-logo.png" alt="Varsaka Labs" className="h-16 w-auto object-contain" />
+            <img 
+              src="/brand/varsaka-logo.png" 
+              alt="Varsaka Labs" 
+              width={64}
+              height={64}
+              style={{ height: '64px', width: 'auto', maxHeight: '64px' }}
+              className="h-16 w-auto object-contain shrink-0" 
+            />
             <div>
               <h1 className="text-2xl font-black text-blue-950 tracking-wider">VARSAKA LABS</h1>
               <p className="text-xs font-semibold text-blue-700 uppercase tracking-widest">
@@ -74,7 +81,14 @@ export const ExperienceLetterTemplate: React.FC<Props> = ({
         <div className="pt-20 flex items-end justify-between">
           <div className="space-y-1">
             <div className="h-14 flex items-center">
-              <img src="/brand/sign.jpeg" alt="Sign" className="h-12 w-auto opacity-85" />
+              <img 
+                src="/brand/sign.jpeg" 
+                alt="Sign" 
+                width={120} 
+                height={48} 
+                style={{ height: '48px', width: 'auto', maxHeight: '48px' }} 
+                className="h-12 w-auto opacity-85" 
+              />
             </div>
             <div className="font-bold text-sm text-blue-950">{data.authorizedSignatoryName || 'Authorized Signatory'}</div>
             <div className="text-xs text-slate-700 font-semibold">{data.authorizedSignatoryTitle || 'Head of Human Resources'}</div>
@@ -82,7 +96,14 @@ export const ExperienceLetterTemplate: React.FC<Props> = ({
           </div>
 
           <div className="flex flex-col items-center">
-            <img src="/brand/varsaka-seal.png" alt="Official Seal" className="h-24 w-auto object-contain opacity-90" />
+            <img 
+              src="/brand/varsaka-seal.png" 
+              alt="Official Seal" 
+              width={96} 
+              height={96} 
+              style={{ height: '96px', width: 'auto', maxHeight: '96px' }} 
+              className="h-24 w-auto object-contain opacity-90 shrink-0" 
+            />
             <span className="text-[9px] uppercase tracking-widest text-slate-400 mt-1">Official Company Seal</span>
           </div>
         </div>
