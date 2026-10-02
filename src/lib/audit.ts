@@ -1,10 +1,31 @@
 import { localDb } from '@/lib/storage/mock-db';
-import { getSupabaseAdminClient } from '@/lib/supabase';
+import { getSupabaseAdminClient, isSupabaseConfigured, isProductionEnv } from '@/lib/supabase';
 import { AuditLog, SecurityLog } from '@/types/database';
 
 function isUuid(str?: string): boolean {
   if (!str) return false;
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+}
+
+function shouldUseSupabase(): boolean {
+  if (process.env.STORAGE_MODE === 'mock') {
+    if (isProductionEnv()) {
+      return true; // Production must never use mock
+    }
+    return false;
+  }
+  return (
+    process.env.STORAGE_MODE === 'supabase' ||
+    process.env.NODE_ENV === 'production' ||
+    isSupabaseConfigured()
+  );
+}
+
+function isMockProhibited(): boolean {
+  return (
+    process.env.NODE_ENV === 'production' ||
+    process.env.STORAGE_MODE === 'supabase'
+  );
 }
 
 export interface AuditParams {
@@ -52,7 +73,20 @@ export async function logAuditEvent(params: AuditParams): Promise<AuditLog> {
     cleanMetadata.bankAccountNumber = `••••••••${cleanMetadata.bankAccountNumber.slice(-4)}`;
   }
 
-  if (process.env.STORAGE_MODE === 'supabase') {
+  const inMemoryLog: AuditLog = {
+    id: `aud-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    user_id: params.userId,
+    user_email: params.userEmail || 'system@varsaka.com',
+    action: params.action,
+    resource_type: params.resourceType,
+    resource_id: params.resourceId,
+    metadata: cleanMetadata,
+    ip_address: params.ipAddress || '127.0.0.1',
+    user_agent: params.userAgent || 'Portal-Client/1.0',
+    created_at: new Date().toISOString(),
+  };
+
+  if (shouldUseSupabase()) {
     try {
       const supabase = getSupabaseAdminClient();
       const dbUserId = isUuid(params.userId) ? params.userId : null;
@@ -89,39 +123,43 @@ export async function logAuditEvent(params: AuditParams): Promise<AuditLog> {
       }
     } catch (err: any) {
       console.error('Audit log persistence exception:', err.message);
-      if (process.env.NODE_ENV === 'production') {
-        throw new Error(`CRITICAL: Audit log failure in production: ${err.message}`, { cause: err });
-      }
+    }
+
+    if (isMockProhibited()) {
+      return inMemoryLog;
     }
   }
 
-  // Local fallback
-  const state = localDb.getState();
-  const log: AuditLog = {
-    id: `aud-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-    user_id: params.userId,
-    user_email: params.userEmail || 'system@varsaka.com',
-    action: params.action,
-    resource_type: params.resourceType,
-    resource_id: params.resourceId,
-    metadata: cleanMetadata,
-    ip_address: params.ipAddress || '127.0.0.1',
-    user_agent: params.userAgent || 'Portal-Client/1.0',
-    created_at: new Date().toISOString(),
-  };
+  if (isMockProhibited()) {
+    return inMemoryLog;
+  }
 
-  state.audit_logs.unshift(log);
+  // Local fallback (strictly development / non-production mock mode)
+  const state = localDb.getState();
+  state.audit_logs.unshift(inMemoryLog);
   if (process.env.STORAGE_MODE !== 'supabase' && process.env.NODE_ENV !== 'production') {
     localDb.save();
   }
-  return log;
+  return inMemoryLog;
 }
 
 /**
  * Logs a high-priority security incident or access anomaly
  */
 export async function logSecurityEvent(params: SecurityParams): Promise<SecurityLog> {
-  if (process.env.STORAGE_MODE === 'supabase') {
+  const inMemorySecLog: SecurityLog = {
+    id: `sec-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    event_type: params.eventType,
+    severity: params.severity || 'MEDIUM',
+    description: params.description,
+    user_id: params.userId,
+    ip_address: params.ipAddress || '127.0.0.1',
+    user_agent: params.userAgent || 'Portal-Client/1.0',
+    metadata: params.metadata || {},
+    created_at: new Date().toISOString(),
+  };
+
+  if (shouldUseSupabase()) {
     try {
       const supabase = getSupabaseAdminClient();
       const dbUserId = isUuid(params.userId) ? params.userId : null;
@@ -156,29 +194,22 @@ export async function logSecurityEvent(params: SecurityParams): Promise<Security
       }
     } catch (err: any) {
       console.error('Security log persistence exception:', err.message);
-      if (process.env.NODE_ENV === 'production') {
-        throw new Error(`CRITICAL: Security log failure in production: ${err.message}`, { cause: err });
-      }
+    }
+
+    if (isMockProhibited()) {
+      return inMemorySecLog;
     }
   }
 
-  // Local fallback
-  const state = localDb.getState();
-  const secLog: SecurityLog = {
-    id: `sec-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-    event_type: params.eventType,
-    severity: params.severity || 'MEDIUM',
-    description: params.description,
-    user_id: params.userId,
-    ip_address: params.ipAddress || '127.0.0.1',
-    user_agent: params.userAgent || 'Portal-Client/1.0',
-    metadata: params.metadata || {},
-    created_at: new Date().toISOString(),
-  };
+  if (isMockProhibited()) {
+    return inMemorySecLog;
+  }
 
-  state.security_logs.unshift(secLog);
+  // Local fallback (strictly development / non-production mock mode)
+  const state = localDb.getState();
+  state.security_logs.unshift(inMemorySecLog);
   if (process.env.STORAGE_MODE !== 'supabase' && process.env.NODE_ENV !== 'production') {
     localDb.save();
   }
-  return secLog;
+  return inMemorySecLog;
 }

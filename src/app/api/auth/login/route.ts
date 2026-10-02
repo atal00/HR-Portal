@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           { error: `Too many failed login attempts. Account locked. Please try again in ${remainingSeconds} seconds.` },
           { 
-            status: 429,
+            status: 423,
             headers: { 'Retry-After': String(remainingSeconds) }
           }
         );
@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
 
     // Fallback: If hash check failed, verify against Supabase Auth (auth.users)
     // for users linked to a Supabase Auth identity (e.g. Primary Admin)
-    if (!isPasswordValid && process.env.STORAGE_MODE === 'supabase' && user.auth_user_id) {
+    if (!isPasswordValid && (process.env.STORAGE_MODE === 'supabase' || process.env.NODE_ENV === 'production') && user.auth_user_id) {
       try {
         const { getSupabaseClient } = await import('@/lib/supabase');
         const supabase = getSupabaseClient();
@@ -192,7 +192,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           { error: `Too many failed login attempts. Account locked. Please try again in ${userLockStatus.lockoutSeconds} seconds.` },
           { 
-            status: 429,
+            status: 423,
             headers: { 'Retry-After': String(userLockStatus.lockoutSeconds) }
           }
         );
@@ -264,14 +264,21 @@ export async function POST(req: NextRequest) {
 
     return res;
   } catch (error: any) {
-    await logSecurityEvent({
-      eventType: 'AUTH_FAILURE',
-      severity: 'CRITICAL',
-      description: `LOGIN_FAILURE: AUTHENTICATION_ERROR: ${error.message || 'Unknown internal error'}`,
-      ipAddress: ip,
-      userAgent,
-      metadata: { reason_category: 'AUTHENTICATION_ERROR', error: error.message },
-    });
-    return NextResponse.json({ error: 'Internal authentication error.' }, { status: 500 });
+    try {
+      await logSecurityEvent({
+        eventType: 'AUTH_FAILURE',
+        severity: 'CRITICAL',
+        description: `LOGIN_FAILURE: AUTHENTICATION_ERROR: ${error.message || 'Unknown internal error'}`,
+        ipAddress: ip,
+        userAgent,
+        metadata: { reason_category: 'AUTHENTICATION_ERROR', error: error.message },
+      });
+    } catch (logErr) {
+      console.error('Failed to log security event in login error handler:', logErr);
+    }
+    return NextResponse.json(
+      { error: error?.message ? `Authentication error: ${error.message}` : 'Internal authentication error.' },
+      { status: 500 }
+    );
   }
 }

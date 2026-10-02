@@ -44,7 +44,19 @@ import {
 } from './password';
 
 function isSupabaseMode(): boolean {
-  return process.env.STORAGE_MODE === 'supabase';
+  if (process.env.STORAGE_MODE === 'mock') {
+    if (isProductionEnv()) {
+      throw new Error(
+        'FATAL DATA INTEGRITY VIOLATION: Mock datastore mode is strictly prohibited in production environments.'
+      );
+    }
+    return false;
+  }
+  return (
+    process.env.STORAGE_MODE === 'supabase' ||
+    process.env.NODE_ENV === 'production' ||
+    isSupabaseConfigured()
+  );
 }
 
 function isUuid(str?: string | null): boolean {
@@ -585,6 +597,9 @@ export const db = {
           mapped.session_version = cred.session_version;
         }
         return mapped;
+      }
+      if (isProductionEnv()) {
+        throw new Error('FATAL: Attempted to read local mock users in production environment.');
       }
       return localDb.getState().users.find((u) => u.email.toLowerCase() === normalizedEmail) || null;
     },
@@ -3794,6 +3809,10 @@ export const db = {
           return null;
         }
         return data as UserCredential | null;
+      }
+
+      if (isProductionEnv()) {
+        return null;
       }
 
       const state = localDb.getState();
