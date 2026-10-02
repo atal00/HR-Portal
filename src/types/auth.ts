@@ -1,4 +1,4 @@
-import { RoleCode, PermissionCode, User } from './database';
+import { RoleCode, PermissionCode } from './database';
 
 export interface SessionUser {
   id: string;
@@ -6,6 +6,9 @@ export interface SessionUser {
   full_name: string;
   role: RoleCode;
   permissions: PermissionCode[];
+  department?: string;
+  must_change_password?: boolean;
+  session_version?: number;
 }
 
 export interface AuthResponse {

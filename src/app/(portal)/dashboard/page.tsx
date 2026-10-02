@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { formatDate } from '@/lib/utils';
 import { hasPermission } from '@/lib/rbac';
+import { AdminActionAlerts } from '@/components/dashboard/AdminActionAlerts';
 import {
   Users,
   UserCheck,
@@ -76,6 +77,9 @@ export default async function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* Super Admin Action Alerts (Certificate Requests & Employee Deletions) */}
+      <AdminActionAlerts userRole={user?.role || 'VIEWER'} />
 
       {/* KPI Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

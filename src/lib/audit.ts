@@ -1,5 +1,11 @@
 import { localDb } from '@/lib/storage/mock-db';
+import { getSupabaseAdminClient } from '@/lib/supabase';
 import { AuditLog, SecurityLog } from '@/types/database';
+
+function isUuid(str?: string): boolean {
+  if (!str) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+}
 
 export interface AuditParams {
   userId?: string;
@@ -7,6 +13,7 @@ export interface AuditParams {
   action: string;
   resourceType: string;
   resourceId?: string;
+  reason?: string;
   metadata?: Record<string, any>;
   ipAddress?: string;
   userAgent?: string;
@@ -26,15 +33,70 @@ export interface SecurityParams {
  * Logs an immutable audit event
  */
 export async function logAuditEvent(params: AuditParams): Promise<AuditLog> {
-  const state = localDb.getState();
-  
   // Sanitize metadata to never store passwords or secrets
   const cleanMetadata = { ...params.metadata };
+  if (params.reason && !cleanMetadata.reason) {
+    cleanMetadata.reason = params.reason;
+  }
   delete cleanMetadata.password;
   delete cleanMetadata.token;
   delete cleanMetadata.secret;
   delete cleanMetadata.apiKey;
+  delete cleanMetadata.serviceRoleKey;
 
+  // Mask sensitive financial identifiers if present in metadata
+  if (typeof cleanMetadata.panNumber === 'string' && cleanMetadata.panNumber.length >= 6) {
+    cleanMetadata.panNumber = `••••••${cleanMetadata.panNumber.slice(-4)}`;
+  }
+  if (typeof cleanMetadata.bankAccountNumber === 'string' && cleanMetadata.bankAccountNumber.length >= 4) {
+    cleanMetadata.bankAccountNumber = `••••••••${cleanMetadata.bankAccountNumber.slice(-4)}`;
+  }
+
+  if (process.env.STORAGE_MODE === 'supabase') {
+    try {
+      const supabase = getSupabaseAdminClient();
+      const dbUserId = isUuid(params.userId) ? params.userId : null;
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .insert({
+          user_id: dbUserId,
+          user_email: params.userEmail || 'system@varsaka.com',
+          action: params.action,
+          resource_type: params.resourceType,
+          resource_id: params.resourceId || null,
+          metadata: cleanMetadata,
+          ip_address: params.ipAddress || '127.0.0.1',
+          user_agent: params.userAgent || 'Portal-Client/1.0',
+        })
+        .select('*')
+        .single();
+
+      if (error) {
+        console.error('Failed to persist audit log to Supabase:', error.message);
+      } else if (data) {
+        return {
+          id: data.id,
+          user_id: data.user_id,
+          user_email: data.user_email,
+          action: data.action,
+          resource_type: data.resource_type,
+          resource_id: data.resource_id,
+          metadata: data.metadata,
+          ip_address: data.ip_address,
+          user_agent: data.user_agent,
+          created_at: data.created_at,
+        };
+      }
+    } catch (err: any) {
+      console.error('Audit log persistence exception:', err.message);
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error(`CRITICAL: Audit log failure in production: ${err.message}`, { cause: err });
+      }
+    }
+  }
+
+  // Local fallback
+  const state = localDb.getState();
   const log: AuditLog = {
     id: `aud-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     user_id: params.userId,
@@ -49,7 +111,9 @@ export async function logAuditEvent(params: AuditParams): Promise<AuditLog> {
   };
 
   state.audit_logs.unshift(log);
-  localDb.save();
+  if (process.env.STORAGE_MODE !== 'supabase' && process.env.NODE_ENV !== 'production') {
+    localDb.save();
+  }
   return log;
 }
 
@@ -57,8 +121,49 @@ export async function logAuditEvent(params: AuditParams): Promise<AuditLog> {
  * Logs a high-priority security incident or access anomaly
  */
 export async function logSecurityEvent(params: SecurityParams): Promise<SecurityLog> {
-  const state = localDb.getState();
+  if (process.env.STORAGE_MODE === 'supabase') {
+    try {
+      const supabase = getSupabaseAdminClient();
+      const dbUserId = isUuid(params.userId) ? params.userId : null;
+      const { data, error } = await supabase
+        .from('security_logs')
+        .insert({
+          event_type: params.eventType,
+          severity: params.severity || 'MEDIUM',
+          description: params.description,
+          user_id: dbUserId,
+          ip_address: params.ipAddress || '127.0.0.1',
+          user_agent: params.userAgent || 'Portal-Client/1.0',
+          metadata: params.metadata || {},
+        })
+        .select('*')
+        .single();
 
+      if (error) {
+        console.error('Failed to persist security log to Supabase:', error.message);
+      } else if (data) {
+        return {
+          id: data.id,
+          event_type: data.event_type,
+          severity: data.severity as any,
+          description: data.description,
+          user_id: data.user_id,
+          ip_address: data.ip_address,
+          user_agent: data.user_agent,
+          metadata: data.metadata,
+          created_at: data.created_at,
+        };
+      }
+    } catch (err: any) {
+      console.error('Security log persistence exception:', err.message);
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error(`CRITICAL: Security log failure in production: ${err.message}`, { cause: err });
+      }
+    }
+  }
+
+  // Local fallback
+  const state = localDb.getState();
   const secLog: SecurityLog = {
     id: `sec-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     event_type: params.eventType,
@@ -72,6 +177,8 @@ export async function logSecurityEvent(params: SecurityParams): Promise<Security
   };
 
   state.security_logs.unshift(secLog);
-  localDb.save();
+  if (process.env.STORAGE_MODE !== 'supabase' && process.env.NODE_ENV !== 'production') {
+    localDb.save();
+  }
   return secLog;
 }

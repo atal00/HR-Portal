@@ -1,6 +1,6 @@
 import React from 'react';
 import { ExperienceLetterData } from '@/types/document';
-import { formatDate } from '@/lib/utils';
+import { formatDate, calculateTenure } from '@/lib/utils';
 import { QRCodeSVG } from 'qrcode.react';
 
 interface Props {
@@ -12,24 +12,36 @@ interface Props {
 
 export const ExperienceLetterTemplate: React.FC<Props> = ({
   data,
-  documentNumber = 'VAR-EXP-2026-000001',
+  documentNumber = 'VAR-EXP-DRAFT',
   verificationId = 'VVR-EXP-PREVIEW',
-  verificationUrl = 'http://localhost:3000/verify/VVR-EXP-PREVIEW',
+  verificationUrl = '',
 }) => {
+  const signatureUrl = data.signatory?.signature_url !== undefined 
+    ? data.signatory.signature_url 
+    : '/brand/sign.jpeg';
+  const stampUrl = data.stamp?.stamp_url !== undefined 
+    ? data.stamp.stamp_url 
+    : '/brand/varsaka-seal.png';
+  const signatoryName = data.signatory?.name || data.authorizedSignatoryName || 'Authorized Signatory';
+  const signatoryTitle = data.signatory?.title || data.authorizedSignatoryTitle || 'Head of Human Resources';
+  const companyName = data.signatory?.company || 'Varsaka Labs Pvt. Ltd.';
+
+  const tenureDuration = data.tenureText || (data.joiningDate && data.lastWorkingDate ? calculateTenure(data.joiningDate, data.lastWorkingDate) : '');
+
   return (
-    <div className="bg-white text-slate-900 font-sans text-[11pt] leading-relaxed max-w-[850px] mx-auto p-14 min-h-[1120px] flex flex-col justify-between shadow-sm print:shadow-none print:max-w-full">
+    <div className="a4-single-page text-slate-900 font-sans text-[10.5pt] leading-relaxed">
       
       {/* Top Header */}
       <div>
-        <div className="flex items-center justify-between border-b-2 border-blue-900 pb-5 mb-8">
+        <div className="flex items-center justify-between border-b-2 border-blue-900 pb-4 mb-6">
           <div className="flex items-center gap-4">
             <img 
               src="/brand/varsaka-logo.png" 
               alt="Varsaka Labs" 
-              width={64}
-              height={64}
-              style={{ height: '64px', width: 'auto', maxHeight: '64px' }}
-              className="h-16 w-auto object-contain shrink-0" 
+              width={60}
+              height={60}
+              style={{ height: '60px', width: 'auto', maxHeight: '60px' }}
+              className="h-15 w-auto object-contain shrink-0" 
             />
             <div>
               <h1 className="text-2xl font-black text-blue-950 tracking-wider">VARSAKA LABS</h1>
@@ -45,19 +57,19 @@ export const ExperienceLetterTemplate: React.FC<Props> = ({
         </div>
 
         {/* Title */}
-        <div className="text-center my-8">
-          <h2 className="text-xl font-bold tracking-wider text-blue-950 border-b-2 border-slate-900 inline-block pb-1 uppercase">
+        <div className="text-center my-6">
+          <h2 className="text-lg font-bold tracking-wider text-blue-950 border-b-2 border-slate-900 inline-block pb-1 uppercase">
             EXPERIENCE & RELIEVING CERTIFICATE
           </h2>
-          <p className="text-xs text-slate-500 mt-2 uppercase tracking-widest font-semibold">
+          <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-widest font-semibold">
             TO WHOMSOEVER IT MAY CONCERN
           </p>
         </div>
 
         {/* Certificate Text */}
-        <div className="space-y-5 text-justify text-sm leading-relaxed text-slate-800">
+        <div className="space-y-4 text-justify text-xs sm:text-sm leading-relaxed text-slate-800">
           <p>
-            This is to formally certify that <strong>Mr./Ms. {data.employeeName}</strong> (Employee ID: <strong>{data.employeeId}</strong>) was employed with <strong>Varsaka Labs Pvt. Ltd.</strong> from <strong>{formatDate(data.joiningDate)}</strong> to <strong>{formatDate(data.lastWorkingDate)}</strong>.
+            This is to formally certify that <strong>Mr./Ms. {data.employeeName}</strong> (Employee ID: <strong>{data.employeeId}</strong>) was employed with <strong>Varsaka Labs Pvt. Ltd.</strong> from <strong>{formatDate(data.joiningDate)}</strong> to <strong>{formatDate(data.lastWorkingDate)}</strong>{tenureDuration ? ` (Tenure: ${tenureDuration})` : ''}.
           </p>
 
           <p>
@@ -72,59 +84,69 @@ export const ExperienceLetterTemplate: React.FC<Props> = ({
             {data.conductAppreciation || 'Their character, professional conduct, and demeanor during their tenure with Varsaka Labs were found to be exemplary.'} All organizational dues, assets, and liabilities have been settled in accordance with standard separation procedures, and they stand relieved of all obligations to Varsaka Labs as of the close of business on <strong>{formatDate(data.lastWorkingDate)}</strong>.
           </p>
 
+          {data.customStatement && (
+            <div className="p-3 bg-slate-50 border-l-2 border-blue-900 rounded-r text-xs text-slate-900 italic leading-relaxed my-2">
+              {data.customStatement}
+            </div>
+          )}
+
           <p>
             We appreciate their valuable service and wish them the very best in all their future personal and professional endeavors.
           </p>
         </div>
 
         {/* Signature & Seal Section */}
-        <div className="pt-20 flex items-end justify-between">
+        <div className="pt-8 flex items-end justify-between">
           <div className="space-y-1">
-            <div className="h-14 flex items-center">
-              <img 
-                src="/brand/sign.jpeg" 
-                alt="Sign" 
-                width={120} 
-                height={48} 
-                style={{ height: '48px', width: 'auto', maxHeight: '48px' }} 
-                className="h-12 w-auto opacity-85" 
-              />
+            <div className="h-12 flex items-center">
+              {signatureUrl && (
+                <img 
+                  src={signatureUrl} 
+                  alt="Authorized Signature" 
+                  width={120} 
+                  height={44} 
+                  style={{ height: '44px', width: 'auto', maxHeight: '44px' }} 
+                  className="h-11 w-auto opacity-85 object-contain" 
+                />
+              )}
             </div>
-            <div className="font-bold text-sm text-blue-950">{data.authorizedSignatoryName || 'Authorized Signatory'}</div>
-            <div className="text-xs text-slate-700 font-semibold">{data.authorizedSignatoryTitle || 'Head of Human Resources'}</div>
-            <div className="text-xs text-slate-600">Varsaka Labs Pvt. Ltd.</div>
+            <div className="font-bold text-sm text-blue-950">{signatoryName}</div>
+            <div className="text-xs text-slate-700 font-semibold">{signatoryTitle}</div>
+            <div className="text-xs text-slate-600">{companyName}</div>
           </div>
 
           <div className="flex flex-col items-center">
-            <img 
-              src="/brand/varsaka-seal.png" 
-              alt="Official Seal" 
-              width={96} 
-              height={96} 
-              style={{ height: '96px', width: 'auto', maxHeight: '96px' }} 
-              className="h-24 w-auto object-contain opacity-90 shrink-0" 
-            />
+            {stampUrl && (
+              <img 
+                src={stampUrl} 
+                alt="Official Seal" 
+                width={84} 
+                height={84} 
+                style={{ height: '84px', width: 'auto', maxHeight: '84px' }} 
+                className="h-20 w-auto object-contain opacity-90 shrink-0" 
+              />
+            )}
             <span className="text-[9px] uppercase tracking-widest text-slate-400 mt-1">Official Company Seal</span>
           </div>
         </div>
 
         {/* Verification Strip */}
-        <div className="mt-12 p-3 bg-slate-50 border border-slate-200 rounded-md flex items-center justify-between text-xs">
+        <div className="mt-6 p-2.5 bg-slate-50 border border-slate-200 rounded-md flex items-center justify-between text-xs">
           <div>
             <div className="font-bold text-blue-950 uppercase tracking-wide">Document Authenticity Verification</div>
             <div className="text-[10px] text-slate-500">Scan QR or verify online with Verification ID:</div>
-            <div className="font-mono font-bold text-blue-700 text-xs mt-1">{verificationId}</div>
+            <div className="font-mono font-bold text-blue-700 text-xs mt-0.5">{verificationId}</div>
           </div>
-          <div className="bg-white p-1.5 border border-slate-200 rounded">
-            <QRCodeSVG value={verificationUrl} size={64} level="M" />
+          <div className="bg-white p-1 border border-slate-200 rounded">
+            <QRCodeSVG value={verificationUrl} size={54} level="M" />
           </div>
         </div>
       </div>
 
       {/* Footer Bar */}
-      <div className="pt-4 border-t border-slate-300 text-[9pt] text-slate-500 text-center">
+      <div className="pt-3 border-t border-slate-300 text-[8.5pt] text-slate-500 text-center">
         <div>Varsaka Labs Pvt. Ltd. • APHB Colony, JV Colony, Indira Nagar, Gachibowli, Hyderabad, Telangana 500032.</div>
-        <div className="text-[8pt] text-slate-400 mt-0.5">
+        <div className="text-[7.5pt] text-slate-400 mt-0.5">
           Email: info@varsakalabs.com • Web: https://varsaka.com/ • Verification: {verificationUrl}
         </div>
       </div>

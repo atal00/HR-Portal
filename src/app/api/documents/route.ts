@@ -4,6 +4,7 @@ import { requireAuthUser } from '@/lib/auth';
 import { hasPermission } from '@/lib/rbac';
 import { logAuditEvent, logSecurityEvent } from '@/lib/audit';
 import { DocumentType } from '@/types/database';
+import { validateVerificationDomain } from '@/lib/utils';
 
 export async function GET(req: NextRequest) {
   try {
@@ -62,6 +63,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Forbidden: You do not possess permission to generate ${document_type}.` }, { status: 403 });
     }
 
+    // Server-side validation: Inactive/Separated employees cannot have new documents generated
+    const emp = await db.employees.getById(employee_id);
+    if (!emp) {
+      return NextResponse.json({ error: 'Associated employee record not found.' }, { status: 404 });
+    }
+
+    if (emp.status === 'INACTIVE' || emp.status === 'SEPARATED' || emp.deletion_status === 'DELETED') {
+      await logSecurityEvent({
+        eventType: 'UNAUTHORIZED_ACCESS',
+        severity: 'MEDIUM',
+        description: `User ${user.email} attempted to generate ${document_type} for inactive/separated employee ${emp.employee_id} (${emp.full_name}).`,
+        userId: user.id,
+      });
+      return NextResponse.json(
+        { error: `Forbidden: Cannot generate new ${document_type} for inactive or separated employee (${emp.employee_id} - ${emp.full_name}). Historical documents remain preserved under audit retention.` },
+        { status: 403 }
+      );
+    }
+
+    // Requirement 17: Validate that the canonical public verification URL is configured before generating official QR
+    const isProduction = process.env.NODE_ENV === 'production';
+    const validation = validateVerificationDomain(isProduction);
+    if (!validation.valid) {
+      return NextResponse.json(
+        { error: `Configuration Error: ${validation.error}. Official document generation halted.` },
+        { status: 500 }
+      );
+    }
+
     const doc = await db.documents.create({
       document_type,
       employee_id,
@@ -84,6 +114,49 @@ export async function POST(req: NextRequest) {
         employee_id: doc.employee_id,
       },
     });
+
+    // Requirement 21: Audit specific document workflow events
+    if (document_type === 'OFFER_LETTER') {
+      if (data_snapshot.bondIncluded === true) {
+        await logAuditEvent({
+          userId: user.id,
+          userEmail: user.email,
+          action: 'OFFER_BOND_SELECTED' as any,
+          resourceType: 'DOCUMENT',
+          resourceId: doc.document_number,
+          metadata: {
+            bondPeriodMonths: data_snapshot.bondPeriodMonths,
+            bondPenaltyAmount: data_snapshot.bondPenaltyAmount,
+          },
+        });
+      }
+      if (data_snapshot.additionalClauses) {
+        await logAuditEvent({
+          userId: user.id,
+          userEmail: user.email,
+          action: 'OFFER_CUSTOM_CLAUSE_UPDATED' as any,
+          resourceType: 'DOCUMENT',
+          resourceId: doc.document_number,
+          metadata: {
+            hasCustomClause: true,
+          },
+        });
+      }
+      if (data_snapshot.isSalaryRevision) {
+        await logAuditEvent({
+          userId: user.id,
+          userEmail: user.email,
+          action: 'OFFER_REVISION_CREATED' as any,
+          resourceType: 'DOCUMENT',
+          resourceId: doc.document_number,
+          metadata: {
+            previousCtc: data_snapshot.previousCtc,
+            revisedCtc: data_snapshot.revisedCtc,
+            revisionEffectiveDate: data_snapshot.revisionEffectiveDate,
+          },
+        });
+      }
+    }
 
     return NextResponse.json(doc, { status: 201 });
   } catch (error: any) {

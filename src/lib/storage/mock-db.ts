@@ -11,7 +11,9 @@ import {
   VerificationLog, 
   Department, 
   DocumentType,
-  DocumentWorkflowStatus
+  DocumentWorkflowStatus,
+  TaskRecord,
+  UserCredential
 } from '@/types/database';
 import { ROLE_PERMISSIONS } from '@/lib/rbac';
 import { formatDocumentNumber, generateVerificationId } from '@/lib/id-generator';
@@ -30,6 +32,8 @@ export interface DatabaseState {
   security_logs: SecurityLog[];
   verification_logs: VerificationLog[];
   sequences: Record<DocumentType, number>;
+  tasks?: TaskRecord[];
+  user_credentials?: UserCredential[];
 }
 
 // Initial Seed Data with approved Varsaka Labs records
@@ -37,7 +41,7 @@ const INITIAL_STATE: DatabaseState = {
   users: [
     {
       id: 'usr-super-admin-01',
-      email: 'admin@varsaka.com',
+      email: 'admin@in.varsaka.com',
       full_name: 'Dr. Vikram Sarabhai',
       role: 'SUPER_ADMIN',
       permissions: ROLE_PERMISSIONS['SUPER_ADMIN'],
@@ -154,6 +158,26 @@ const INITIAL_STATE: DatabaseState = {
       created_by: 'usr-hr-admin-01',
       created_at: '2026-01-05T10:00:00Z',
       updated_at: '2026-01-05T10:00:00Z',
+    },
+    {
+      id: 'emp-vl-1086',
+      employee_id: 'VL 1086',
+      full_name: 'Atal Kumar Pandey',
+      email: 'atal.pandey@varsaka.com',
+      phone: '+91 9876543210',
+      address: 'APHB Colony, JV Colony, Indira Nagar, Gachibowli, Hyderabad, Telangana 500032',
+      department_id: 'dept-eng',
+      department_name: 'Engineering & Technology',
+      designation: 'Principal Architect & Founder',
+      joining_date: '2024-01-15',
+      last_working_date: null,
+      employment_type: 'FULL_TIME',
+      work_location: 'Hyderabad, India',
+      reporting_manager: 'Board of Directors',
+      status: 'ACTIVE',
+      created_by: 'usr-admin-01',
+      created_at: '2024-01-15T00:00:00Z',
+      updated_at: '2024-01-15T00:00:00Z',
     },
   ],
 
@@ -418,7 +442,7 @@ const INITIAL_STATE: DatabaseState = {
     {
       id: 'aud-001',
       user_id: 'usr-super-admin-01',
-      user_email: 'admin@varsaka.com',
+      user_email: 'admin@in.varsaka.com',
       action: 'SYSTEM_INITIALIZED',
       resource_type: 'SYSTEM',
       resource_id: 'portal-core',
@@ -467,6 +491,7 @@ const INITIAL_STATE: DatabaseState = {
     SALARY_SLIP: 1001,
     CERTIFICATE: 1002,
   },
+  tasks: [],
 };
 
 class LocalDatabase {
@@ -493,6 +518,11 @@ class LocalDatabase {
   }
 
   private persist(state: DatabaseState) {
+    if (process.env.NODE_ENV === 'production' || process.env.STORAGE_MODE === 'supabase') {
+      throw new Error(
+        'FATAL DATA INTEGRITY VIOLATION: Accidental writes to local JSON mock datastore (.system_data/db_store.json) are strictly prohibited when STORAGE_MODE=supabase or NODE_ENV=production.'
+      );
+    }
     try {
       if (!fs.existsSync(DATA_DIR)) {
         fs.mkdirSync(DATA_DIR, { recursive: true });

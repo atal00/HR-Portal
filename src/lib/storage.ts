@@ -3,6 +3,8 @@ import path from 'path';
 import crypto from 'crypto';
 import { DocumentType } from '@/types/database';
 
+import { getSupabaseAdminClient } from './supabase';
+
 const STORAGE_ROOT = path.join(process.cwd(), 'storage', 'documents');
 
 const SUBFOLDERS: Record<DocumentType, string> = {
@@ -12,6 +14,8 @@ const SUBFOLDERS: Record<DocumentType, string> = {
   SALARY_SLIP: 'salary',
   CERTIFICATE: 'certificate',
 };
+
+export const SUPABASE_DOCUMENTS_BUCKET = 'hr-documents';
 
 export interface StoredDocumentMetadata {
   filePath: string;
@@ -32,28 +36,65 @@ export function ensureStorageDirectories() {
 }
 
 /**
- * Saves a document artifact to the private storage bucket
+ * Saves a document artifact to the private storage bucket (Supabase or local)
  */
 export async function saveDocumentFile(
   type: DocumentType,
   documentNumber: string,
   buffer: Buffer
 ): Promise<StoredDocumentMetadata> {
-  ensureStorageDirectories();
   const folder = SUBFOLDERS[type] || 'general';
   const fileName = `${documentNumber.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+  const storagePath = `${folder}/${fileName}`;
+  const hash = crypto.createHash('sha256').update(buffer).digest('hex');
+
+  if (process.env.STORAGE_MODE === 'supabase') {
+    const supabase = getSupabaseAdminClient();
+    const { error } = await supabase.storage
+      .from(SUPABASE_DOCUMENTS_BUCKET)
+      .upload(storagePath, buffer, {
+        contentType: 'application/pdf',
+        upsert: true,
+      });
+
+    if (error) {
+      throw new Error(`Failed to upload document to private Supabase bucket (${SUPABASE_DOCUMENTS_BUCKET}): ${error.message}`);
+    }
+
+    return {
+      filePath: storagePath,
+      fileSizeBytes: buffer.length,
+      checksumSha256: hash,
+    };
+  }
+
+  ensureStorageDirectories();
   const relativePath = path.join(folder, fileName);
   const absolutePath = path.join(STORAGE_ROOT, relativePath);
 
   fs.writeFileSync(absolutePath, buffer);
-
-  const hash = crypto.createHash('sha256').update(buffer).digest('hex');
 
   return {
     filePath: relativePath.replace(/\\/g, '/'),
     fileSizeBytes: buffer.length,
     checksumSha256: hash,
   };
+}
+
+/**
+ * Generates a time-limited signed download URL from Supabase Storage
+ */
+export async function createSupabaseSignedDownloadUrl(filePath: string, expiresInSeconds: number = 900): Promise<string> {
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase.storage
+    .from(SUPABASE_DOCUMENTS_BUCKET)
+    .createSignedUrl(filePath, expiresInSeconds);
+
+  if (error || !data?.signedUrl) {
+    throw new Error(`Failed to generate signed URL from Supabase Storage: ${error?.message || 'File not accessible'}`);
+  }
+
+  return data.signedUrl;
 }
 
 /**

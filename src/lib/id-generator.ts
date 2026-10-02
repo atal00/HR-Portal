@@ -39,7 +39,40 @@ export function formatDocumentNumber(type: DocumentType, sequence: number, date:
  * Example: VVR-CERT-7B9A2E, VVR-REL-7B9A2E
  */
 export function generateVerificationId(type: DocumentType): string {
-  const typeShort = type === 'RELIEVING_LETTER' ? 'REL' : type.substring(0, 4);
+  let typeShort = 'DOC';
+  switch (type) {
+    case 'OFFER_LETTER':
+      typeShort = 'OFF';
+      break;
+    case 'EXPERIENCE_LETTER':
+      typeShort = 'EXP';
+      break;
+    case 'RELIEVING_LETTER':
+      typeShort = 'REL';
+      break;
+    case 'SALARY_SLIP':
+      typeShort = 'SAL';
+      break;
+    case 'CERTIFICATE':
+      typeShort = 'CERT';
+      break;
+  }
   const randomHex = crypto.randomBytes(4).toString('hex').toUpperCase();
   return `VVR-${typeShort}-${randomHex}`;
 }
+
+/**
+ * Formats a sequential employee ID: EMP-VL-1001, EMP-VL-1002, etc.
+ */
+export function formatEmployeeId(sequence: number): string {
+  return `EMP-VL-${sequence}`;
+}
+
+/**
+ * Parses sequential number from an employee ID if formatted as EMP-VL-XXXX
+ */
+export function parseEmployeeIdSequence(id: string): number | null {
+  const match = id.match(/^EMP-VL-(\d+)$/i);
+  return match ? parseInt(match[1], 10) : null;
+}
+

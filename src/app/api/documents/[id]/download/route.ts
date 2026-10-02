@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { hasPermission } from '@/lib/rbac';
-import { generateSignedDownloadToken, verifySignedDownloadToken } from '@/lib/storage';
+import { 
+  generateSignedDownloadToken, 
+  verifySignedDownloadToken,
+  createSupabaseSignedDownloadUrl 
+} from '@/lib/storage';
 import { logAuditEvent, logSecurityEvent } from '@/lib/audit';
 import { rateLimiter } from '@/lib/rate-limit';
 
@@ -104,7 +108,15 @@ export async function POST(
 
     // 5. Generate signed URL
     const signedToken = generateSignedDownloadToken(doc.id, 900); // 15 minutes
-    const signedUrl = `/api/documents/${doc.id}/download?token=${signedToken}`;
+    let signedUrl = `/api/documents/${doc.id}/download?token=${signedToken}`;
+
+    if (process.env.STORAGE_MODE === 'supabase' && doc.file_path) {
+      try {
+        signedUrl = await createSupabaseSignedDownloadUrl(doc.file_path, 900);
+      } catch {
+        // Fall back to portal-proxied token URL
+      }
+    }
 
     return NextResponse.json({
       success: true,

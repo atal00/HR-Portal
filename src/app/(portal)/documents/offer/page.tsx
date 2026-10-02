@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { OfferLetterData } from '@/types/document';
 import { Employee } from '@/types/database';
-import { calculateSalaryBreakdown, formatCurrency } from '@/lib/utils';
+import { calculateSalaryBreakdown, formatCurrency, getPublicVerificationBaseUrl } from '@/lib/utils';
 import { OfferLetterTemplate } from '@/components/documents/OfferLetterTemplate';
-import { FileText, Eye, CheckCircle2, Sparkles, Building2, User, ArrowLeft } from 'lucide-react';
+import { FileText, Eye, CheckCircle2, Sparkles, User, ArrowLeft, Shield, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 
 export default function GenerateOfferLetterPage() {
@@ -22,30 +22,45 @@ export default function GenerateOfferLetterPage() {
     defaultValues: {
       offerType: 'direct-fulltime',
       offerDate: new Date().toISOString().split('T')[0],
-      candidateName: 'Test Employee 001',
-      candidateAddress: 'Plot 1, Block A, Financial District, Hyderabad, Telangana 500032',
-      designation: 'Finance & Operations Analyst',
-      department: 'Finance & Operations',
+      candidateName: '',
+      candidateAddress: '',
+      designation: '',
+      department: '',
       joiningDate: new Date().toISOString().split('T')[0],
-      employeeCode: 'VL 1083',
-      annualCtc: 500000,
-      annualCtcWords: 'Five Lakh Rupees Only',
+      employeeCode: '',
+      annualCtc: 600000,
+      annualCtcWords: 'Six Lakh Rupees Only',
+      
+      // Bond decision
+      bondIncluded: false,
       bondPeriodMonths: 24,
       bondPenaltyAmount: 300000,
+      bondTerms: 'You will sign the bond period of 24 months from your date of joining in the organization. You must pay the company ₹3,00,000 if the bond is broken by you.',
+      bondEffectiveDate: new Date().toISOString().split('T')[0],
       noticePeriodMonths: 3,
-      basic: 16667,
-      hra: 8333,
-      communicationAllowance: 4167,
-      travelAllowance: 4167,
-      foodAllowance: 4167,
-      otherAllowances: 4167,
-      monthlyGrossSalary: 41668,
+
+      // Custom clause
+      additionalClauses: '',
+
+      // Salary revision
+      isSalaryRevision: false,
+      previousCtc: 500000,
+      revisedCtc: 600000,
+      revisionEffectiveDate: new Date().toISOString().split('T')[0],
+
+      basic: 20000,
+      hra: 10000,
+      communicationAllowance: 5000,
+      travelAllowance: 5000,
+      foodAllowance: 5000,
+      otherAllowances: 5000,
+      monthlyGrossSalary: 50000,
       employeePf: 1800,
       employerPf: 1800,
       professionalTax: 200,
-      gratuity: 801,
+      gratuity: 962,
       tds: 0,
-      monthlyNetSalary: 37066,
+      monthlyNetSalary: 44438,
       yearlyVariable: 0,
     }
   });
@@ -55,10 +70,16 @@ export default function GenerateOfferLetterPage() {
   useEffect(() => {
     async function loadEmployees() {
       try {
-        const res = await fetch('/api/employees');
+        const res = await fetch('/api/employees?activeOnly=true');
         if (res.ok) {
           const list: Employee[] = await res.json();
-          setEmployees(list);
+          const activeList = list.filter(
+            (e) => e.status !== 'INACTIVE' && e.status !== 'SEPARATED' && (e as any).deletion_status !== 'DELETED'
+          );
+          setEmployees(activeList);
+          if (activeList.length > 0) {
+            handleSelectEmployee(activeList[0].id, activeList[0]);
+          }
         }
       } catch (e) {
         console.error(e);
@@ -67,16 +88,44 @@ export default function GenerateOfferLetterPage() {
     loadEmployees();
   }, []);
 
-  const handleSelectEmployee = (empId: string) => {
+  const handleSelectEmployee = (empId: string, preloadedEmp?: Employee) => {
     setSelectedEmpId(empId);
-    const emp = employees.find((e) => e.id === empId);
+    const emp = preloadedEmp || employees.find((e) => e.id === empId);
     if (emp) {
+      const actualDept = emp.department_name || emp.department || emp.custom_department || '';
       setValue('candidateName', emp.full_name);
-      setValue('candidateAddress', emp.address);
+      setValue('candidateAddress', emp.permanent_address || emp.address);
       setValue('designation', emp.designation);
-      setValue('department', emp.department_name || 'General');
+      setValue('department', actualDept);
       setValue('employeeCode', emp.employee_id);
       setValue('joiningDate', emp.joining_date);
+
+      // Auto-load master salary record if present
+      fetch(`/api/salary/${emp.id}`)
+        .then(async (res) => {
+          if (res.ok) {
+            const sal = await res.json();
+            if (sal && sal.annual_ctc) {
+              setValue('annualCtc', sal.annual_ctc);
+              const b = calculateSalaryBreakdown(sal.annual_ctc, sal.variable_pay || 0);
+              setValue('basic', b.basic);
+              setValue('hra', b.hra);
+              setValue('communicationAllowance', b.communicationAllowance);
+              setValue('travelAllowance', b.travelAllowance);
+              setValue('foodAllowance', b.foodAllowance);
+              setValue('otherAllowances', b.otherAllowances);
+              setValue('monthlyGrossSalary', b.monthlyGross);
+              setValue('employeePf', b.employeePf);
+              setValue('employerPf', b.employerPf);
+              setValue('professionalTax', b.professionalTax);
+              setValue('gratuity', b.gratuity);
+              setValue('tds', b.tds);
+              setValue('monthlyNetSalary', b.netSalary);
+              setValue('annualCtcWords', b.annualCtcWords);
+            }
+          }
+        })
+        .catch(() => {});
     }
   };
 
@@ -103,12 +152,15 @@ export default function GenerateOfferLetterPage() {
     setError(null);
 
     try {
-      // Find employee ID or pick default
       let empId = selectedEmpId;
       if (!empId) {
         const matched = employees.find((e) => e.employee_id === data.employeeCode);
-        empId = matched ? matched.id : (employees[0]?.id || 'emp-test-001');
+        empId = matched ? matched.id : (employees[0]?.id || 'emp-placeholder');
       }
+
+      const docTitle = data.isSalaryRevision
+        ? `Compensation Revision Offer Letter - ${data.candidateName}`
+        : `Full-Time Offer Letter - ${data.candidateName}`;
 
       const res = await fetch('/api/documents', {
         method: 'POST',
@@ -116,7 +168,7 @@ export default function GenerateOfferLetterPage() {
         body: JSON.stringify({
           document_type: 'OFFER_LETTER',
           employee_id: empId,
-          title: `Full-Time Offer Letter - ${data.candidateName}`,
+          title: docTitle,
           data_snapshot: data,
         }),
       });
@@ -135,10 +187,14 @@ export default function GenerateOfferLetterPage() {
     }
   };
 
+  const verificationBase = typeof window !== 'undefined' 
+    ? (process.env.NEXT_PUBLIC_PUBLIC_VERIFICATION_BASE_URL || window.location.origin)
+    : 'https://varsaka.com';
+
   return (
     <div className="space-y-6">
       
-      {/* Top Bar */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Link
@@ -150,15 +206,14 @@ export default function GenerateOfferLetterPage() {
           <div>
             <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
               <FileText className="h-5 w-5 text-blue-600" />
-              Full-Time Offer Letter Generator
+              Offer Letter & Contract Generator
             </h1>
             <p className="text-xs text-slate-500">
-              16-17 Page authentic Varsaka contract with Annexures 1A through III B
+              Generate full-time employment agreements, bond covenants, and compensation revisions
             </p>
           </div>
         </div>
 
-        {/* View Switcher Tabs */}
         <div className="flex items-center gap-1 bg-slate-200 p-1 rounded-lg text-xs font-semibold self-start sm:self-auto">
           <button
             type="button"
@@ -173,26 +228,31 @@ export default function GenerateOfferLetterPage() {
             className={`px-3 py-1.5 rounded-md transition flex items-center gap-1.5 ${activeTab === 'preview' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
           >
             <Eye className="h-3.5 w-3.5" />
-            Live Preview (16 Pages)
+            Live Document Preview
           </button>
         </div>
       </div>
 
       {error && (
-        <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-xs text-red-800">
-          <strong>Generation Error:</strong> {error}
+        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-red-600" />
+          <span><strong>Generation Error:</strong> {error}</span>
         </div>
       )}
 
-      {/* Main Content Area */}
       {activeTab === 'form' ? (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           
-          {/* Quick Select Employee */}
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2 text-blue-950 font-bold">
-              <User className="h-4 w-4 text-blue-600" />
-              <span>Select Existing Candidate / Employee:</span>
+          {/* Employee Selection Quick-Fill */}
+          <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div>
+              <span className="font-bold text-blue-950 flex items-center gap-1.5">
+                <User className="h-4 w-4 text-blue-600" />
+                Select Existing Employee / Candidate
+              </span>
+              <p className="text-blue-700 text-[11px] mt-0.5">
+                Auto-populates candidate credentials and actual department dynamically.
+              </p>
             </div>
             <select
               value={selectedEmpId}
@@ -213,29 +273,32 @@ export default function GenerateOfferLetterPage() {
             
             {/* Candidate & Contract Info */}
             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-3.5 text-xs">
-              <h2 className="font-bold text-slate-900 border-b border-slate-100 pb-2">Candidate Details</h2>
+              <h2 className="font-bold text-slate-900 border-b border-slate-100 pb-2">Candidate & Role Specification</h2>
               
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Full Candidate Name</label>
+                <label className="font-semibold text-slate-700 block mb-1">Full Candidate Name *</label>
                 <input
                   {...register('candidateName', { required: true })}
+                  placeholder="Candidate full name"
                   className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600"
                 />
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Official Designation</label>
+                <label className="font-semibold text-slate-700 block mb-1">Official Designation *</label>
                 <input
                   {...register('designation', { required: true })}
+                  placeholder="e.g. Senior Software Engineer"
                   className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Department</label>
+                  <label className="font-semibold text-slate-700 block mb-1">Department *</label>
                   <input
-                    {...register('department')}
+                    {...register('department', { required: true })}
+                    placeholder="e.g. Engineering & Technology"
                     className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600"
                   />
                 </div>
@@ -243,6 +306,7 @@ export default function GenerateOfferLetterPage() {
                   <label className="font-semibold text-slate-700 block mb-1">Employee Code</label>
                   <input
                     {...register('employeeCode')}
+                    placeholder="e.g. EMP-VL-1001"
                     className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 font-mono"
                   />
                 </div>
@@ -250,7 +314,7 @@ export default function GenerateOfferLetterPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Offer Date</label>
+                  <label className="font-semibold text-slate-700 block mb-1">Offer Issue Date</label>
                   <input
                     type="date"
                     {...register('offerDate')}
@@ -270,30 +334,135 @@ export default function GenerateOfferLetterPage() {
               <div>
                 <label className="font-semibold text-slate-700 block mb-1">Residential Address</label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   {...register('candidateAddress')}
+                  placeholder="Complete residential address"
                   className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3 pt-2">
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Bond Period (Months)</label>
-                  <input
-                    type="number"
-                    {...register('bondPeriodMonths', { valueAsNumber: true })}
-                    className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600"
-                  />
+              {/* Salary Hike / Revision Toggle (Requirement 14) */}
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-amber-900">Is this a Salary Hike / Revision Offer Letter?</span>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      {...register('isSalaryRevision')}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
+                  </label>
                 </div>
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Bond Penalty (₹)</label>
-                  <input
-                    type="number"
-                    {...register('bondPenaltyAmount', { valueAsNumber: true })}
-                    className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600"
-                  />
-                </div>
+                {formValues.isSalaryRevision && (
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-amber-200">
+                    <div>
+                      <label className="text-[11px] font-semibold text-amber-900 block">Previous CTC (₹)</label>
+                      <input
+                        type="number"
+                        {...register('previousCtc', { valueAsNumber: true })}
+                        className="w-full p-1.5 border border-amber-300 rounded bg-white font-mono text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-amber-900 block">Revision Effective Date</label>
+                      <input
+                        type="date"
+                        {...register('revisionEffectiveDate')}
+                        className="w-full p-1.5 border border-amber-300 rounded bg-white text-xs"
+                      />
+                    </div>
+                    <p className="text-[10px] text-amber-800 col-span-2">
+                      Generates a separate, immutable revision document. The original employment contract remains permanent and unaffected.
+                    </p>
+                  </div>
+                )}
               </div>
+
+              {/* Employment Bond Decision (Requirements 10 & 11) */}
+              <div className="p-3.5 bg-slate-50 border border-slate-300 rounded-lg space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-bold text-slate-900 block">Employment Bond Decision</span>
+                    <span className="text-[11px] text-slate-500">Does this offer include an employment bond?</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="inline-flex items-center gap-1 cursor-pointer font-semibold text-xs">
+                      <input
+                        type="radio"
+                        value="false"
+                        checked={formValues.bondIncluded === false}
+                        onChange={() => setValue('bondIncluded', false)}
+                        className="text-blue-600"
+                      />
+                      <span>No</span>
+                    </label>
+                    <label className="inline-flex items-center gap-1 cursor-pointer font-semibold text-xs text-blue-700">
+                      <input
+                        type="radio"
+                        value="true"
+                        checked={formValues.bondIncluded === true}
+                        onChange={() => setValue('bondIncluded', true)}
+                        className="text-blue-600"
+                      />
+                      <span>Yes</span>
+                    </label>
+                  </div>
+                </div>
+
+                {formValues.bondIncluded && (
+                  <div className="space-y-2.5 pt-2 border-t border-slate-200">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">Bond Duration (Months)</label>
+                        <input
+                          type="number"
+                          {...register('bondPeriodMonths', { valueAsNumber: true })}
+                          className="w-full p-1.5 border border-slate-300 rounded bg-white font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">Bond Penalty Amount (₹)</label>
+                        <input
+                          type="number"
+                          {...register('bondPenaltyAmount', { valueAsNumber: true })}
+                          className="w-full p-1.5 border border-slate-300 rounded bg-white font-mono"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="font-semibold text-slate-700 block mb-1">
+                        Controlled Bond Clause Statement
+                      </label>
+                      <textarea
+                        rows={2}
+                        {...register('bondTerms')}
+                        className="w-full p-2 border border-slate-300 rounded bg-white text-xs"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Controlled Custom Authorized Clause (Requirement 2) */}
+              <div className="p-3.5 bg-slate-50 border border-slate-300 rounded-lg space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-900">Additional Employment Clause</span>
+                  <span className="text-[10px] uppercase font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">
+                    CUSTOM AUTHORIZED CONTENT
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Approved core company legal clauses remain immutable. Authorized HR users may enter custom operational stipulations below.
+                </p>
+                <textarea
+                  rows={3}
+                  {...register('additionalClauses')}
+                  placeholder="Optional custom authorized clauses or specific work stipulations..."
+                  className="w-full p-2 border border-slate-300 rounded-lg bg-white text-xs outline-none focus:ring-2 focus:ring-blue-600"
+                />
+              </div>
+
             </div>
 
             {/* Compensation & Annexure 1A Breakdown */}
@@ -312,7 +481,7 @@ export default function GenerateOfferLetterPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Annual CTC (₹)</label>
+                  <label className="font-semibold text-slate-700 block mb-1">Annual CTC (₹) *</label>
                   <input
                     type="number"
                     {...register('annualCtc', { valueAsNumber: true })}
@@ -418,7 +587,7 @@ export default function GenerateOfferLetterPage() {
         <div className="space-y-4">
           <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200">
             <span className="text-xs text-slate-600">
-              Live Preview of 16-page contract generated with dynamic fields.
+              Live Preview of official offer letter contract with dynamic clauses and bond configurations.
             </span>
             <button
               onClick={() => setActiveTab('form')}
@@ -433,7 +602,7 @@ export default function GenerateOfferLetterPage() {
               data={formValues}
               documentNumber="VAR-OFF-PREVIEW"
               verificationId="VVR-OFF-PREVIEW"
-              verificationUrl="http://localhost:3000/verify/VVR-OFF-PREVIEW"
+              verificationUrl={`${verificationBase}/verify/VVR-OFF-PREVIEW`}
             />
           </div>
         </div>

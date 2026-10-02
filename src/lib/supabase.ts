@@ -13,17 +13,28 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+export function getSupabaseUrl(): string | undefined {
+  return process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+}
+
+export function getSupabaseAnonKey(): string | undefined {
+  return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
+}
+
+export function getSupabaseServiceRoleKey(): string | undefined {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+}
 
 export function isSupabaseConfigured(): boolean {
-  if (!supabaseUrl || !supabaseAnonKey) return false;
+  const url = getSupabaseUrl();
+  const anonKey = getSupabaseAnonKey();
+  if (!url || !anonKey) return false;
   if (
-    supabaseUrl.includes('placeholder') ||
-    supabaseUrl.includes('your-project-id') ||
-    supabaseAnonKey.includes('your-supabase') ||
-    supabaseAnonKey.includes('placeholder')
+    url.includes('placeholder') ||
+    url.includes('your-project-id') ||
+    anonKey.includes('your-supabase') ||
+    anonKey.includes('placeholder') ||
+    anonKey.trim() === ''
   ) {
     return false;
   }
@@ -41,17 +52,20 @@ export function isProductionEnv(): boolean {
 // Client-safe anonymous Supabase client (respects RLS)
 let publicClient: SupabaseClient | null = null;
 export function getSupabaseClient(): SupabaseClient {
-  if (!isSupabaseConfigured()) {
+  const url = getSupabaseUrl();
+  const anonKey = getSupabaseAnonKey();
+
+  if (!isSupabaseConfigured() || !url || !anonKey) {
     if (isProductionEnv()) {
       throw new Error(
-        'FATAL CONFIGURATION ERROR: Production environment requires valid Supabase credentials (NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY). Placeholder or missing keys are prohibited in production.'
+        'FATAL CONFIGURATION ERROR: Production environment requires valid Supabase credentials (NEXT_PUBLIC_SUPABASE_URL/SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY/SUPABASE_PUBLISHABLE_KEY). Placeholder or missing keys are prohibited in production.'
       );
     }
     throw new Error('Supabase client is not configured with live credentials.');
   }
 
   if (!publicClient) {
-    publicClient = createClient(supabaseUrl!, supabaseAnonKey!, {
+    publicClient = createClient(url, anonKey, {
       auth: {
         persistSession: false,
         autoRefreshToken: false,
@@ -68,17 +82,20 @@ export function getSupabaseAdminClient(): SupabaseClient {
     throw new Error('CRITICAL SECURITY VIOLATION: getSupabaseAdminClient() called from client bundle!');
   }
 
-  if (!isSupabaseConfigured() || !supabaseServiceRoleKey || supabaseServiceRoleKey.includes('placeholder')) {
+  const url = getSupabaseUrl();
+  const serviceRoleKey = getSupabaseServiceRoleKey();
+
+  if (!isSupabaseConfigured() || !url || !serviceRoleKey || serviceRoleKey.includes('placeholder') || serviceRoleKey.trim() === '') {
     if (isProductionEnv()) {
       throw new Error(
-        'FATAL CONFIGURATION ERROR: Production environment requires SUPABASE_SERVICE_ROLE_KEY. Refusing fallback in production.'
+        'FATAL CONFIGURATION ERROR: Production environment requires SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY. Refusing fallback in production.'
       );
     }
     throw new Error('Supabase Admin client is not configured with live credentials.');
   }
 
   if (!adminClient) {
-    adminClient = createClient(supabaseUrl!, supabaseServiceRoleKey, {
+    adminClient = createClient(url, serviceRoleKey, {
       auth: {
         persistSession: false,
         autoRefreshToken: false,

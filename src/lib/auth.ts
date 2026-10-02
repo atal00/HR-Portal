@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
 import { SessionUser } from '@/types/auth';
-import { PermissionCode, RoleCode } from '@/types/database';
+import { PermissionCode } from '@/types/database';
 import { hasPermission } from './rbac';
 
 const SESSION_COOKIE_NAME = 'varsaka_session';
@@ -33,14 +33,45 @@ export function verifySessionToken(token: string): SessionUser | null {
 }
 
 /**
- * Server-side getter for authenticated user session from HTTP cookies
+ * Server-side getter for authenticated user session from HTTP cookies.
+ * Validates session signature, user active status, session_version,
+ * and derives authoritative role and permissions from the database.
  */
 export async function getCurrentUser(): Promise<SessionUser | null> {
   try {
     const cookieStore = await cookies();
     const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
     if (!token) return null;
-    return verifySessionToken(token);
+
+    const sessionUser = verifySessionToken(token);
+    if (!sessionUser || !sessionUser.id) return null;
+
+    // Dynamic import to prevent circular dependency with db.ts
+    const { db } = await import('@/lib/db');
+    const dbUser = await db.users.getById(sessionUser.id);
+    if (!dbUser || !dbUser.is_active) {
+      return null;
+    }
+
+    // Validate authoritative session_version
+    const currentVersion = await db.userCredentials.getSessionVersion(sessionUser.id);
+    if (currentVersion !== null) {
+      if (!sessionUser.session_version || sessionUser.session_version !== currentVersion) {
+        return null;
+      }
+    }
+
+    // Authoritative server-side role and permissions
+    return {
+      id: dbUser.id,
+      email: dbUser.email,
+      full_name: dbUser.full_name,
+      role: dbUser.role,
+      permissions: dbUser.permissions,
+      department: dbUser.department,
+      must_change_password: dbUser.must_change_password ?? false,
+      session_version: currentVersion ?? sessionUser.session_version,
+    };
   } catch {
     return null;
   }
@@ -58,10 +89,13 @@ export class AuthError extends Error {
 /**
  * Server-side guard requiring authentication
  */
-export async function requireAuthUser(): Promise<SessionUser> {
+export async function requireAuthUser(options: { allowPendingPasswordChange?: boolean } = {}): Promise<SessionUser> {
   const user = await getCurrentUser();
   if (!user) {
     throw new AuthError('UNAUTHORIZED: Authentication session required.', 401);
+  }
+  if (user.must_change_password && !options.allowPendingPasswordChange) {
+    throw new AuthError('PASSWORD_CHANGE_REQUIRED: Mandatory password change required before accessing portal.', 403);
   }
   return user;
 }

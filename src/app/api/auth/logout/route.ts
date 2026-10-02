@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AUTH_COOKIE, getCurrentUser } from '@/lib/auth';
 import { logAuditEvent } from '@/lib/audit';
+import { db } from '@/lib/db';
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (user) {
+    // Invalidate server-side session token
+    await db.userCredentials.incrementSessionVersion(user.id);
+
     await logAuditEvent({
       userId: user.id,
       userEmail: user.email,

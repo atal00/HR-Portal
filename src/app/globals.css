@@ -60,22 +60,176 @@ img, svg, video, canvas {
   display: block;
 }
 
+/* Official A4 Document Sizing & Print Standards */
+@page {
+  size: A4;
+  margin: 0;
+}
+
+/* Screen Document Layout */
+.a4-page {
+  width: 210mm;
+  min-height: 297mm;
+  padding: 18mm 20mm;
+  margin: 0 auto 24px auto;
+  background: #ffffff;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.a4-single-page {
+  width: 210mm;
+  min-height: 297mm;
+  padding: 18mm 20mm;
+  margin: 0 auto;
+  background: #ffffff;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.a4-certificate-page {
+  width: 210mm;
+  min-height: 297mm;
+  padding: 12mm;
+  margin: 0 auto;
+  background: #ffffff;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  box-sizing: border-box;
+}
+
 /* Document Printing Rules */
 @media print {
-  body {
-    background: transparent !important;
-    color: #000 !important;
+  html, body {
+    width: 210mm !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
-  .no-print {
+
+  /* Completely suppress dashboard chrome */
+  nav,
+  aside,
+  header,
+  .no-print,
+  [role="navigation"],
+  .portal-nav,
+  .portal-sidebar,
+  .portal-breadcrumb {
     display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
   }
+
+  /* Reset main layout wrappers */
+  main,
+  .portal-main,
+  .portal-content,
+  .document-outer-container,
+  .document-inner-wrapper {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+    width: 210mm !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
   .print-only {
     display: block !important;
   }
+
+  /* A4 standard multi-page sheet (Offer Letter pages) */
+  .a4-page {
+    width: 210mm !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
+    max-height: 297mm !important;
+    padding: 16mm 20mm !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    box-sizing: border-box !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    overflow: hidden !important;
+    background: #ffffff !important;
+    position: relative !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+  }
+
+  /* Last page of multi-page document */
+  .a4-page-last {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+
+  /* A4 single-page document (Experience Letter, Relieving Letter, Salary Slip) */
+  .a4-single-page {
+    width: 210mm !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
+    max-height: 297mm !important;
+    padding: 16mm 20mm !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    box-sizing: border-box !important;
+    page-break-after: auto !important;
+    break-after: auto !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    overflow: hidden !important;
+    background: #ffffff !important;
+    position: relative !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+  }
+
+  /* A4 Certificate */
+  .a4-certificate-page {
+    width: 210mm !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
+    max-height: 297mm !important;
+    padding: 10mm !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    box-sizing: border-box !important;
+    page-break-after: auto !important;
+    break-after: auto !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    overflow: hidden !important;
+    background: #ffffff !important;
+    position: relative !important;
+  }
+
   .page-break-after {
     page-break-after: always !important;
     break-after: page !important;
   }
+
   .page-break-inside-avoid {
     page-break-inside: avoid !important;
     break-inside: avoid !important;

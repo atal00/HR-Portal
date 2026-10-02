@@ -137,3 +137,96 @@ export function calculateSalaryBreakdown(annualCtc: number, variablePay: number 
     annualCtcWords: numberToWordsINR(annualCtc),
   };
 }
+
+/**
+ * Dynamically calculates tenure between joining date and relieving/end date
+ * Example: 20 Jan 2025 -> 01 Oct 2026 => "1 year, 8 months"
+ */
+export function calculateTenure(startDateStr?: string | null, endDateStr?: string | null): string {
+  if (!startDateStr) return '';
+  const start = new Date(startDateStr);
+  const end = endDateStr ? new Date(endDateStr) : new Date();
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return '';
+
+  let years = end.getFullYear() - start.getFullYear();
+  let months = end.getMonth() - start.getMonth();
+  const days = end.getDate() - start.getDate();
+
+  if (days < 0) {
+    months -= 1;
+  }
+  if (months < 0) {
+    years -= 1;
+    months += 12;
+  }
+
+  const parts: string[] = [];
+  if (years > 0) {
+    parts.push(`${years} ${years === 1 ? 'year' : 'years'}`);
+  }
+  if (months > 0) {
+    parts.push(`${months} ${months === 1 ? 'month' : 'months'}`);
+  }
+  if (parts.length === 0) {
+    return 'Less than 1 month';
+  }
+  return parts.join(', ');
+}
+
+/**
+ * Returns the environment-configured canonical public verification base URL.
+ * Automatically adapts across deployment domains without code modification.
+ */
+export function getPublicVerificationBaseUrl(): string {
+  const configured = process.env.NEXT_PUBLIC_PUBLIC_VERIFICATION_BASE_URL || process.env.PUBLIC_VERIFICATION_BASE_URL;
+  if (configured && configured.trim()) {
+    return configured.trim().replace(/\/+$/, '');
+  }
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL;
+  if (appUrl && appUrl.trim()) {
+    return appUrl.trim().replace(/\/+$/, '');
+  }
+  return 'http://localhost:3000';
+}
+
+/**
+ * Validates that the public verification base URL is legitimate for production use
+ */
+export function validateVerificationDomain(isProduction: boolean = false): { valid: boolean; url: string; error?: string } {
+  const url = getPublicVerificationBaseUrl();
+  if (isProduction) {
+    if (!url || url.includes('localhost') || url.includes('127.0.0.1')) {
+      return {
+        valid: false,
+        url,
+        error: 'CRITICAL CONFIGURATION ERROR: Public verification domain is not configured for production. Refusing to issue official QR verification URL with unverified domain.',
+      };
+    }
+  }
+  return { valid: true, url };
+}
+
+/**
+ * Formats bank account number with privacy masking, showing only the last 4 digits
+ * e.g. "1234567890", "HDFC Bank" -> "HDFC Bank - •••• 7890"
+ */
+export function maskBankNumber(accountNumber?: string, bankName?: string): string {
+  if (!accountNumber) return '';
+  const trimmed = accountNumber.trim();
+  const last4 = trimmed.slice(-4);
+  const prefix = bankName ? `${bankName} - ` : '';
+  return `${prefix}••••${last4}`;
+}
+
+/**
+ * Safely masks PAN number for presentation: e.g. "ABCDE1234F" -> "••••••1234" (or "ABCDE••••F" with middle mode)
+ */
+export function maskPanNumber(pan?: string): string {
+  if (!pan) return '';
+  const trimmed = pan.trim().toUpperCase();
+  if (trimmed.length === 10) {
+    return `••••••${trimmed.slice(5, 9)}`;
+  }
+  return trimmed;
+}
+

@@ -6,7 +6,8 @@ import { useForm } from 'react-hook-form';
 import { RelievingLetterData } from '@/types/document';
 import { Employee } from '@/types/database';
 import { RelievingLetterTemplate } from '@/components/documents/RelievingLetterTemplate';
-import { FileSpreadsheet, Eye, CheckCircle2, User, ArrowLeft } from 'lucide-react';
+import { calculateTenure } from '@/lib/utils';
+import { FileSpreadsheet, Eye, CheckCircle2, User, ArrowLeft, Clock, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 
 export default function GenerateRelievingLetterPage() {
@@ -20,17 +21,19 @@ export default function GenerateRelievingLetterPage() {
   const { register, handleSubmit, watch, setValue } = useForm<RelievingLetterData>({
     defaultValues: {
       issueDate: new Date().toISOString().split('T')[0],
-      employeeName: 'Test Employee 001',
-      employeeId: 'VL 1083',
-      designation: 'Finance & Operations Analyst',
-      department: 'Finance & Operations',
-      joiningDate: '2025-12-01',
+      employeeName: '',
+      employeeId: '',
+      designation: '',
+      department: '',
+      joiningDate: '',
       lastWorkingDate: new Date().toISOString().split('T')[0],
       employmentType: 'Full-Time Regular',
       workLocation: 'Hyderabad, India',
-      resignationDate: '2026-02-15',
+      resignationDate: '',
       relievingDate: new Date().toISOString().split('T')[0],
+      tenureText: '',
       clearanceStatus: 'Satisfactorily Completed - All dues & company property cleared',
+      customStatement: '',
       authorizedSignatoryName: 'Authorized Signatory',
       authorizedSignatoryTitle: 'Head of Human Resources',
     }
@@ -41,10 +44,16 @@ export default function GenerateRelievingLetterPage() {
   useEffect(() => {
     async function loadEmployees() {
       try {
-        const res = await fetch('/api/employees');
+        const res = await fetch('/api/employees?activeOnly=true');
         if (res.ok) {
           const list: Employee[] = await res.json();
-          setEmployees(list);
+          const activeList = list.filter(
+            (e) => e.status !== 'INACTIVE' && e.status !== 'SEPARATED' && (e as any).deletion_status !== 'DELETED'
+          );
+          setEmployees(activeList);
+          if (activeList.length > 0) {
+            handleSelectEmployee(activeList[0].id, activeList[0]);
+          }
         }
       } catch (e) {
         console.error(e);
@@ -53,19 +62,30 @@ export default function GenerateRelievingLetterPage() {
     loadEmployees();
   }, []);
 
-  const handleSelectEmployee = (empId: string) => {
+  const handleSelectEmployee = (empId: string, preloadedEmp?: Employee) => {
     setSelectedEmpId(empId);
-    const emp = employees.find((e) => e.id === empId);
+    const emp = preloadedEmp || employees.find((e) => e.id === empId);
     if (emp) {
+      const actualDept = emp.department_name || emp.department || emp.custom_department || '';
+      const lastDate = emp.last_working_date || new Date().toISOString().split('T')[0];
       setValue('employeeName', emp.full_name);
       setValue('employeeId', emp.employee_id);
       setValue('designation', emp.designation);
-      setValue('department', emp.department_name || 'General');
+      setValue('department', actualDept);
       setValue('joiningDate', emp.joining_date);
-      setValue('lastWorkingDate', emp.last_working_date || new Date().toISOString().split('T')[0]);
-      setValue('employmentType', emp.employment_type);
+      setValue('lastWorkingDate', lastDate);
+      setValue('employmentType', emp.employment_type === 'INTERNSHIP' ? 'Internship' : 'Full-Time Regular');
       setValue('workLocation', emp.work_location);
-      setValue('relievingDate', emp.last_working_date || new Date().toISOString().split('T')[0]);
+      setValue('relievingDate', lastDate);
+      if (emp.joining_date && lastDate) {
+        setValue('tenureText', calculateTenure(emp.joining_date, lastDate));
+      }
+    }
+  };
+
+  const onDatesChange = (joining: string, relieving: string) => {
+    if (joining && relieving) {
+      setValue('tenureText', calculateTenure(joining, relieving));
     }
   };
 
@@ -77,7 +97,7 @@ export default function GenerateRelievingLetterPage() {
       let empId = selectedEmpId;
       if (!empId) {
         const matched = employees.find((e) => e.employee_id === data.employeeId);
-        empId = matched ? matched.id : (employees[0]?.id || 'emp-test-001');
+        empId = matched ? matched.id : (employees[0]?.id || 'emp-placeholder');
       }
 
       const res = await fetch('/api/documents', {
@@ -86,7 +106,7 @@ export default function GenerateRelievingLetterPage() {
         body: JSON.stringify({
           document_type: 'RELIEVING_LETTER',
           employee_id: empId,
-          title: `Relieving & Separation Letter - ${data.employeeName}`,
+          title: `Relieving Order - ${data.employeeName}`,
           data_snapshot: data,
         }),
       });
@@ -105,6 +125,10 @@ export default function GenerateRelievingLetterPage() {
     }
   };
 
+  const verificationBase = typeof window !== 'undefined' 
+    ? (process.env.NEXT_PUBLIC_PUBLIC_VERIFICATION_BASE_URL || window.location.origin)
+    : 'https://varsaka.com';
+
   return (
     <div className="space-y-6">
       
@@ -118,11 +142,11 @@ export default function GenerateRelievingLetterPage() {
           </Link>
           <div>
             <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-              <FileSpreadsheet className="h-5 w-5 text-purple-600" />
-              Relieving & Separation Letter Generator
+              <FileSpreadsheet className="h-5 w-5 text-indigo-600" />
+              Relieving & Separation Order Generator
             </h1>
             <p className="text-xs text-slate-500">
-              Official separation order with confirmed relieving date, department clearance, and handover verification
+              Official formal release letter confirming separation, clearance, and non-disclosure covenants
             </p>
           </div>
         </div>
@@ -131,14 +155,14 @@ export default function GenerateRelievingLetterPage() {
           <button
             type="button"
             onClick={() => setActiveTab('form')}
-            className={`px-3 py-1.5 rounded-md transition ${activeTab === 'form' ? 'bg-white text-purple-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+            className={`px-3 py-1.5 rounded-md transition ${activeTab === 'form' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
           >
             Configuration Form
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('preview')}
-            className={`px-3 py-1.5 rounded-md transition flex items-center gap-1.5 ${activeTab === 'preview' ? 'bg-white text-purple-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+            className={`px-3 py-1.5 rounded-md transition flex items-center gap-1.5 ${activeTab === 'preview' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
           >
             <Eye className="h-3.5 w-3.5" />
             Live Preview
@@ -147,7 +171,7 @@ export default function GenerateRelievingLetterPage() {
       </div>
 
       {error && (
-        <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-xs text-red-800">
+        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
           <strong>Generation Error:</strong> {error}
         </div>
       )}
@@ -155,15 +179,21 @@ export default function GenerateRelievingLetterPage() {
       {activeTab === 'form' ? (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           
-          <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2 text-purple-950 font-bold">
-              <User className="h-4 w-4 text-purple-600" />
-              <span>Select Employee from Directory:</span>
+          {/* Quick Select Employee */}
+          <div className="bg-indigo-50 border border-indigo-200 p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div>
+              <span className="font-bold text-indigo-950 flex items-center gap-1.5">
+                <User className="h-4 w-4 text-indigo-600" />
+                Select Separating Employee
+              </span>
+              <p className="text-indigo-700 text-[11px] mt-0.5">
+                Automatically loads employee identity, actual department, and date records.
+              </p>
             </div>
             <select
               value={selectedEmpId}
               onChange={(e) => handleSelectEmployee(e.target.value)}
-              className="px-3 py-1.5 border border-purple-300 rounded-lg bg-white text-purple-950 font-medium outline-none focus:ring-2 focus:ring-purple-600"
+              className="px-3 py-1.5 border border-indigo-300 rounded-lg bg-white text-indigo-950 font-medium outline-none focus:ring-2 focus:ring-indigo-600"
             >
               <option value="">-- Choose Employee --</option>
               {employees.map((emp) => (
@@ -174,37 +204,68 @@ export default function GenerateRelievingLetterPage() {
             </select>
           </div>
 
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-4 text-xs">
+          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4 text-xs">
+            <h2 className="font-bold text-slate-900 border-b border-slate-100 pb-2">
+              Separation & Order Parameters
+            </h2>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Employee Name</label>
+                <label className="font-semibold text-slate-700 block mb-1">Employee Full Name *</label>
                 <input
                   {...register('employeeName', { required: true })}
-                  className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-600"
+                  placeholder="Employee legal full name"
+                  className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-600"
                 />
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Employee ID</label>
+                <label className="font-semibold text-slate-700 block mb-1">Employee ID *</label>
                 <input
                   {...register('employeeId', { required: true })}
-                  className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-600 font-mono"
+                  placeholder="e.g. EMP-VL-1001"
+                  className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-600 font-mono"
                 />
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Designation</label>
+                <label className="font-semibold text-slate-700 block mb-1">Designation *</label>
                 <input
                   {...register('designation', { required: true })}
-                  className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-600"
+                  placeholder="Designation at time of exit"
+                  className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-600"
                 />
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Department</label>
+                <label className="font-semibold text-slate-700 block mb-1">Department (Dynamic) *</label>
                 <input
                   {...register('department', { required: true })}
-                  className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-600"
+                  placeholder="Employee actual department"
+                  className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-600"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Resignation Submission Date</label>
+                <input
+                  type="date"
+                  {...register('resignationDate')}
+                  className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-600"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Effective Relieving Date *</label>
+                <input
+                  type="date"
+                  {...register('relievingDate', { required: true })}
+                  onChange={(e) => {
+                    setValue('relievingDate', e.target.value);
+                    setValue('lastWorkingDate', e.target.value);
+                    onDatesChange(formValues.joiningDate, e.target.value);
+                  }}
+                  className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-600"
                 />
               </div>
 
@@ -212,78 +273,72 @@ export default function GenerateRelievingLetterPage() {
                 <label className="font-semibold text-slate-700 block mb-1">Date of Joining</label>
                 <input
                   type="date"
-                  {...register('joiningDate', { required: true })}
-                  className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-600"
+                  {...register('joiningDate')}
+                  onChange={(e) => {
+                    setValue('joiningDate', e.target.value);
+                    onDatesChange(e.target.value, formValues.relievingDate || formValues.lastWorkingDate);
+                  }}
+                  className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-600"
                 />
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Last Working Date</label>
+                <label className="font-semibold text-slate-700 block mb-1">Order Issue Date</label>
                 <input
                   type="date"
-                  {...register('lastWorkingDate', { required: true })}
-                  className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-600"
+                  {...register('issueDate')}
+                  className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-600"
                 />
               </div>
 
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">Resignation Submission Date (Optional)</label>
+              {/* Dynamic Tenure Display */}
+              <div className="sm:col-span-2 p-3 bg-indigo-50/70 border border-indigo-200 rounded-lg flex items-center justify-between">
+                <div>
+                  <span className="font-bold text-indigo-950 flex items-center gap-1.5">
+                    <Clock className="h-4 w-4 text-indigo-600" />
+                    Dynamically Calculated Total Tenure
+                  </span>
+                  <p className="text-[11px] text-indigo-700 mt-0.5">
+                    Computed from date of joining through effective relieving date.
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="font-bold font-mono text-sm text-indigo-950 bg-white px-2.5 py-1 rounded border border-indigo-200">
+                    {formValues.tenureText || (formValues.joiningDate && formValues.relievingDate ? calculateTenure(formValues.joiningDate, formValues.relievingDate) : 'Pending Dates')}
+                  </span>
+                </div>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="font-semibold text-slate-700 block mb-1">Clearance Status Description</label>
                 <input
-                  type="date"
-                  {...register('resignationDate')}
-                  className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-600"
+                  {...register('clearanceStatus')}
+                  className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-600"
                 />
               </div>
 
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">Effective Relieving Date</label>
-                <input
-                  type="date"
-                  {...register('relievingDate', { required: true })}
-                  className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-600"
+              {/* Editable Issuer Additional Statement */}
+              <div className="sm:col-span-2 p-4 bg-slate-50 border border-slate-300 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                    <ShieldCheck className="h-4 w-4 text-blue-600" />
+                    Additional Separation Statement (Controlled Issuer Remarks)
+                  </span>
+                  <span className="text-[10px] uppercase font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">
+                    CONTROLLED ISSUER SECTION
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Approved standard separation order remains default. Authorized HR users can add custom remarks or specific settlement confirmations below.
+                </p>
+                <textarea
+                  rows={3}
+                  {...register('customStatement')}
+                  placeholder="Optional additional separation statements, mutual release covenants, or specific farewell remarks..."
+                  className="w-full p-2.5 border border-slate-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-600"
                 />
               </div>
 
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">Employment Type</label>
-                <input
-                  {...register('employmentType', { required: true })}
-                  className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-600"
-                />
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">Work Location</label>
-                <input
-                  {...register('workLocation', { required: true })}
-                  className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-600"
-                />
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">Authorized Signatory Name</label>
-                <input
-                  {...register('authorizedSignatoryName', { required: true })}
-                  className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-600"
-                />
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">Authorized Signatory Title</label>
-                <input
-                  {...register('authorizedSignatoryTitle', { required: true })}
-                  className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-600"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">Clearance & Settlement Status</label>
-              <textarea
-                {...register('clearanceStatus')}
-                rows={2}
-                className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-600"
-              />
             </div>
           </div>
 
@@ -291,47 +346,43 @@ export default function GenerateRelievingLetterPage() {
             <button
               type="button"
               onClick={() => setActiveTab('preview')}
-              className="px-4 py-2 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+              className="px-4 py-2.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition flex items-center gap-1.5"
             >
-              Preview Document
+              <Eye className="h-4 w-4" />
+              Preview Order
             </button>
             <button
               type="submit"
               disabled={generating}
-              className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-2 shadow-xs disabled:opacity-50"
+              className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-lg text-xs font-bold transition shadow-sm disabled:opacity-50"
             >
               <CheckCircle2 className="h-4 w-4" />
-              {generating ? 'Registering Document...' : 'Generate Official Relieving Letter'}
+              {generating ? 'Issuing Relieving Order...' : 'Generate & Send for Approval'}
             </button>
           </div>
+
         </form>
       ) : (
         <div className="space-y-4">
-          <div className="bg-slate-100 p-6 rounded-xl border border-slate-200 overflow-x-auto">
+          <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200">
+            <span className="text-xs text-slate-600">
+              Live Preview of official relieving order.
+            </span>
+            <button
+              onClick={() => setActiveTab('form')}
+              className="px-4 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700"
+            >
+              Back to Form
+            </button>
+          </div>
+
+          <div className="border border-slate-300 rounded-xl overflow-hidden p-4 bg-slate-200 flex justify-center">
             <RelievingLetterTemplate
               data={formValues}
               documentNumber="VAR-REL-PREVIEW"
               verificationId="VVR-REL-PREVIEW"
-              verificationUrl="http://localhost:3000/verify/VVR-REL-PREVIEW"
+              verificationUrl={`${verificationBase}/verify/VVR-REL-PREVIEW`}
             />
-          </div>
-          <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200">
-            <button
-              type="button"
-              onClick={() => setActiveTab('form')}
-              className="px-4 py-2 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
-            >
-              Back to Form
-            </button>
-            <button
-              type="button"
-              onClick={handleSubmit(onSubmit)}
-              disabled={generating}
-              className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-2 shadow-xs disabled:opacity-50"
-            >
-              <CheckCircle2 className="h-4 w-4" />
-              {generating ? 'Registering...' : 'Approve & Issue Document'}
-            </button>
           </div>
         </div>
       )}

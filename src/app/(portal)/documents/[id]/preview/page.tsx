@@ -117,7 +117,7 @@ export default function DocumentPreviewPage() {
         </button>
       </div>
 
-      <div className="bg-slate-200/90 p-4 md:p-8 rounded-xl border border-slate-300 flex justify-center">
+      <div className="document-outer-container bg-slate-200/90 p-4 md:p-8 rounded-xl border border-slate-300 flex justify-center">
         <div className="w-full">
           {renderTemplate()}
         </div>

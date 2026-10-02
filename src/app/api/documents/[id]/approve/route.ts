@@ -11,17 +11,22 @@ export async function POST(
   try {
     const user = await requireAuthUser();
 
-    if (!canApproveDocument(user)) {
+    const { id } = await params;
+    const targetDoc = await db.documents.getById(id);
+    if (!targetDoc) {
+      return NextResponse.json({ error: 'Document not found.' }, { status: 404 });
+    }
+
+    if (!canApproveDocument(user, targetDoc.document_type)) {
       await logSecurityEvent({
         eventType: 'UNAUTHORIZED_APPROVAL_ATTEMPT',
         severity: 'HIGH',
-        description: `User ${user.email} (${user.role}) attempted to approve document without approval authority.`,
+        description: `User ${user.email} (${user.role}) attempted to approve document ${targetDoc.document_number} (${targetDoc.document_type}) without approval authority.`,
         userId: user.id,
       });
       return NextResponse.json({ error: 'Forbidden: Insufficient authority to approve documents.' }, { status: 403 });
     }
 
-    const { id } = await params;
     const approvedDoc = await db.documents.approve(id, user.id, user.full_name);
 
     await logAuditEvent({

@@ -25,33 +25,33 @@ export default function GenerateSalarySlipPage() {
 
   const { register, handleSubmit, watch, setValue } = useForm<SalarySlipData>({
     defaultValues: {
-      month: 'September',
-      year: 2026,
-      employeeId: 'VL 1083',
-      employeeName: 'Test Employee 001',
-      designation: 'Finance & Operations Analyst',
-      department: 'Finance & Operations',
-      joiningDate: '2025-12-01',
-      bankAccountNumber: 'HDFC Bank - •••• 4092',
-      panNumber: 'ABCDE1234F',
-      pfNumber: 'PF/HYD/1083/01',
+      month: MONTHS[new Date().getMonth() === 0 ? 11 : new Date().getMonth() - 1],
+      year: new Date().getFullYear(),
+      employeeId: '',
+      employeeName: '',
+      designation: '',
+      department: '',
+      joiningDate: '',
+      bankAccountNumber: '',
+      panNumber: '',
+      pfNumber: '',
       paidDays: 30,
       lossOfPayDays: 0,
-      basic: 16667,
-      hra: 8333,
-      communicationAllowance: 4167,
-      travelAllowance: 4167,
-      foodAllowance: 4167,
-      otherAllowances: 4167,
-      grossSalary: 41668,
-      employeePf: 1800,
-      employerPf: 1800,
-      professionalTax: 200,
-      gratuity: 801,
+      basic: 0,
+      hra: 0,
+      communicationAllowance: 0,
+      travelAllowance: 0,
+      foodAllowance: 0,
+      otherAllowances: 0,
+      grossSalary: 0,
+      employeePf: 0,
+      employerPf: 0,
+      professionalTax: 0,
+      gratuity: 0,
       tds: 0,
-      totalDeductions: 4601,
-      netSalary: 37067,
-      netSalaryInWords: 'Thirty-Seven Thousand Sixty-Seven Rupees Only',
+      totalDeductions: 0,
+      netSalary: 0,
+      netSalaryInWords: 'Zero Rupees Only',
     }
   });
 
@@ -60,10 +60,16 @@ export default function GenerateSalarySlipPage() {
   useEffect(() => {
     async function loadEmployees() {
       try {
-        const res = await fetch('/api/employees');
+        const res = await fetch('/api/employees?activeOnly=true');
         if (res.ok) {
           const list: Employee[] = await res.json();
-          setEmployees(list);
+          const activeList = list.filter(
+            (e) => e.status !== 'INACTIVE' && e.status !== 'SEPARATED' && (e as any).deletion_status !== 'DELETED'
+          );
+          setEmployees(activeList);
+          if (activeList.length > 0) {
+            handleSelectEmployee(activeList[0].id, activeList[0]);
+          }
         }
       } catch (e) {
         console.error(e);
@@ -72,15 +78,17 @@ export default function GenerateSalarySlipPage() {
     loadEmployees();
   }, []);
 
-  const handleSelectEmployee = async (empId: string) => {
+  const handleSelectEmployee = async (empId: string, preloadedEmp?: Employee) => {
     setSelectedEmpId(empId);
-    const emp = employees.find((e) => e.id === empId);
+    const emp = preloadedEmp || employees.find((e) => e.id === empId);
     if (!emp) return;
+
+    const actualDept = emp.department_name || emp.department || emp.custom_department || '';
 
     setValue('employeeName', emp.full_name);
     setValue('employeeId', emp.employee_id);
     setValue('designation', emp.designation);
-    setValue('department', emp.department_name || 'General');
+    setValue('department', actualDept);
     setValue('joiningDate', emp.joining_date);
 
     // Automatically fetch confidential salary structure for this employee
@@ -105,6 +113,34 @@ export default function GenerateSalarySlipPage() {
         setValue('totalDeductions', totalDed);
         setValue('netSalary', sal.net_salary);
         setValue('netSalaryInWords', numberToWordsINR(sal.net_salary));
+
+        // Employee-specific PAN
+        const pan = sal.pan_number || emp.pan_number || '';
+        setValue('panNumber', pan);
+
+        // Employee-specific Bank Info
+        const bankName = sal.bank_name || emp.bank_name || '';
+        const acct = sal.bank_account_number || emp.bank_account_number || '';
+        let bankDisplay = '';
+        if (acct) {
+          const masked = acct.length > 4 ? `•••• ${acct.slice(-4)}` : acct;
+          bankDisplay = bankName ? `${bankName} - ${masked}` : masked;
+        }
+        setValue('bankAccountNumber', bankDisplay);
+        setValue('pfNumber', sal.pf_number || emp.pf_number || '');
+      } else {
+        // Fallback to employee records if salary API not yet configured
+        const pan = emp.pan_number || '';
+        setValue('panNumber', pan);
+        const bankName = emp.bank_name || '';
+        const acct = emp.bank_account_number || '';
+        let bankDisplay = '';
+        if (acct) {
+          const masked = acct.length > 4 ? `•••• ${acct.slice(-4)}` : acct;
+          bankDisplay = bankName ? `${bankName} - ${masked}` : masked;
+        }
+        setValue('bankAccountNumber', bankDisplay);
+        setValue('pfNumber', emp.pf_number || '');
       }
     } catch (e) {
       console.error('Error fetching payroll record:', e);

@@ -6,7 +6,8 @@ import { useForm } from 'react-hook-form';
 import { ExperienceLetterData } from '@/types/document';
 import { Employee } from '@/types/database';
 import { ExperienceLetterTemplate } from '@/components/documents/ExperienceLetterTemplate';
-import { FileSpreadsheet, Eye, CheckCircle2, User, ArrowLeft } from 'lucide-react';
+import { calculateTenure } from '@/lib/utils';
+import { FileSpreadsheet, Eye, CheckCircle2, User, ArrowLeft, Clock, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 
 export default function GenerateExperienceLetterPage() {
@@ -20,15 +21,17 @@ export default function GenerateExperienceLetterPage() {
   const { register, handleSubmit, watch, setValue } = useForm<ExperienceLetterData>({
     defaultValues: {
       issueDate: new Date().toISOString().split('T')[0],
-      employeeName: 'Test Employee 001',
-      employeeId: 'VL 1083',
-      designation: 'Finance & Operations Analyst',
-      department: 'Finance & Operations',
-      joiningDate: '2025-12-01',
+      employeeName: '',
+      employeeId: '',
+      designation: '',
+      department: '',
+      joiningDate: '',
       lastWorkingDate: new Date().toISOString().split('T')[0],
       employmentType: 'Full-Time Regular',
       workLocation: 'Hyderabad, India',
+      tenureText: '',
       conductAppreciation: 'Their character, professional conduct, and demeanor during their tenure with Varsaka Labs were found to be exemplary.',
+      customStatement: '',
       authorizedSignatoryName: 'Authorized Signatory',
       authorizedSignatoryTitle: 'Head of Human Resources',
     }
@@ -39,10 +42,16 @@ export default function GenerateExperienceLetterPage() {
   useEffect(() => {
     async function loadEmployees() {
       try {
-        const res = await fetch('/api/employees');
+        const res = await fetch('/api/employees?activeOnly=true');
         if (res.ok) {
           const list: Employee[] = await res.json();
-          setEmployees(list);
+          const activeList = list.filter(
+            (e) => e.status !== 'INACTIVE' && e.status !== 'SEPARATED' && (e as any).deletion_status !== 'DELETED'
+          );
+          setEmployees(activeList);
+          if (activeList.length > 0) {
+            handleSelectEmployee(activeList[0].id, activeList[0]);
+          }
         }
       } catch (e) {
         console.error(e);
@@ -51,18 +60,29 @@ export default function GenerateExperienceLetterPage() {
     loadEmployees();
   }, []);
 
-  const handleSelectEmployee = (empId: string) => {
+  const handleSelectEmployee = (empId: string, preloadedEmp?: Employee) => {
     setSelectedEmpId(empId);
-    const emp = employees.find((e) => e.id === empId);
+    const emp = preloadedEmp || employees.find((e) => e.id === empId);
     if (emp) {
+      const actualDept = emp.department_name || emp.department || emp.custom_department || '';
+      const lastDate = emp.last_working_date || new Date().toISOString().split('T')[0];
       setValue('employeeName', emp.full_name);
       setValue('employeeId', emp.employee_id);
       setValue('designation', emp.designation);
-      setValue('department', emp.department_name || 'General');
+      setValue('department', actualDept);
       setValue('joiningDate', emp.joining_date);
-      setValue('lastWorkingDate', emp.last_working_date || new Date().toISOString().split('T')[0]);
-      setValue('employmentType', emp.employment_type);
+      setValue('lastWorkingDate', lastDate);
+      setValue('employmentType', emp.employment_type === 'INTERNSHIP' ? 'Internship' : 'Full-Time Regular');
       setValue('workLocation', emp.work_location);
+      if (emp.joining_date && lastDate) {
+        setValue('tenureText', calculateTenure(emp.joining_date, lastDate));
+      }
+    }
+  };
+
+  const onDatesChange = (joining: string, relieving: string) => {
+    if (joining && relieving) {
+      setValue('tenureText', calculateTenure(joining, relieving));
     }
   };
 
@@ -74,7 +94,7 @@ export default function GenerateExperienceLetterPage() {
       let empId = selectedEmpId;
       if (!empId) {
         const matched = employees.find((e) => e.employee_id === data.employeeId);
-        empId = matched ? matched.id : (employees[0]?.id || 'emp-test-001');
+        empId = matched ? matched.id : (employees[0]?.id || 'emp-placeholder');
       }
 
       const res = await fetch('/api/documents', {
@@ -102,6 +122,10 @@ export default function GenerateExperienceLetterPage() {
     }
   };
 
+  const verificationBase = typeof window !== 'undefined' 
+    ? (process.env.NEXT_PUBLIC_PUBLIC_VERIFICATION_BASE_URL || window.location.origin)
+    : 'https://varsaka.com';
+
   return (
     <div className="space-y-6">
       
@@ -119,7 +143,7 @@ export default function GenerateExperienceLetterPage() {
               Experience & Relieving Certificate Generator
             </h1>
             <p className="text-xs text-slate-500">
-              Official separation certificate with confirmed dates, role, and conduct appraisal
+              Official separation certificate with dynamic department, verified tenure calculation, and custom issuer statement
             </p>
           </div>
         </div>
@@ -144,7 +168,7 @@ export default function GenerateExperienceLetterPage() {
       </div>
 
       {error && (
-        <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-xs text-red-800">
+        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
           <strong>Generation Error:</strong> {error}
         </div>
       )}
@@ -152,10 +176,16 @@ export default function GenerateExperienceLetterPage() {
       {activeTab === 'form' ? (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           
-          <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2 text-indigo-950 font-bold">
-              <User className="h-4 w-4 text-indigo-600" />
-              <span>Select Employee from Directory:</span>
+          {/* Quick Select Employee */}
+          <div className="bg-indigo-50 border border-indigo-200 p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div>
+              <span className="font-bold text-indigo-950 flex items-center gap-1.5">
+                <User className="h-4 w-4 text-indigo-600" />
+                Select Separating / Past Employee
+              </span>
+              <p className="text-indigo-700 text-[11px] mt-0.5">
+                Pulls employee ID, actual department, and joining date dynamically.
+              </p>
             </div>
             <select
               value={selectedEmpId}
@@ -171,62 +201,97 @@ export default function GenerateExperienceLetterPage() {
             </select>
           </div>
 
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-4 text-xs">
+          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4 text-xs">
+            <h2 className="font-bold text-slate-900 border-b border-slate-100 pb-2">
+              Certificate Details & Verification Parameters
+            </h2>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Employee Name</label>
+                <label className="font-semibold text-slate-700 block mb-1">Employee Full Name *</label>
                 <input
                   {...register('employeeName', { required: true })}
+                  placeholder="Full legal employee name"
                   className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-600"
                 />
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Employee ID</label>
+                <label className="font-semibold text-slate-700 block mb-1">Employee ID *</label>
                 <input
                   {...register('employeeId', { required: true })}
+                  placeholder="e.g. EMP-VL-1001"
                   className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-600 font-mono"
                 />
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Designation</label>
+                <label className="font-semibold text-slate-700 block mb-1">Designation *</label>
                 <input
                   {...register('designation', { required: true })}
+                  placeholder="Official job title"
                   className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-600"
                 />
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Department</label>
+                <label className="font-semibold text-slate-700 block mb-1">Department (Dynamic) *</label>
                 <input
                   {...register('department', { required: true })}
+                  placeholder="e.g. Engineering & Technology"
                   className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-600"
                 />
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Joining Date</label>
+                <label className="font-semibold text-slate-700 block mb-1">Joining Date *</label>
                 <input
                   type="date"
                   {...register('joiningDate', { required: true })}
+                  onChange={(e) => {
+                    setValue('joiningDate', e.target.value);
+                    onDatesChange(e.target.value, formValues.lastWorkingDate);
+                  }}
                   className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-600"
                 />
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Last Working Date</label>
+                <label className="font-semibold text-slate-700 block mb-1">Relieving / Last Working Date *</label>
                 <input
                   type="date"
                   {...register('lastWorkingDate', { required: true })}
+                  onChange={(e) => {
+                    setValue('lastWorkingDate', e.target.value);
+                    onDatesChange(formValues.joiningDate, e.target.value);
+                  }}
                   className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-600"
                 />
+              </div>
+
+              {/* Dynamic Tenure Calculation Display */}
+              <div className="sm:col-span-2 p-3 bg-indigo-50/70 border border-indigo-200 rounded-lg flex items-center justify-between">
+                <div>
+                  <span className="font-bold text-indigo-950 flex items-center gap-1.5">
+                    <Clock className="h-4 w-4 text-indigo-600" />
+                    Dynamically Calculated Tenure
+                  </span>
+                  <p className="text-[11px] text-indigo-700 mt-0.5">
+                    Calculated automatically from joining date to relieving date.
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="font-bold font-mono text-sm text-indigo-950 bg-white px-2.5 py-1 rounded border border-indigo-200">
+                    {formValues.tenureText || (formValues.joiningDate && formValues.lastWorkingDate ? calculateTenure(formValues.joiningDate, formValues.lastWorkingDate) : 'Pending Dates')}
+                  </span>
+                </div>
               </div>
 
               <div>
                 <label className="font-semibold text-slate-700 block mb-1">Work Location</label>
                 <input
                   {...register('workLocation')}
+                  placeholder="e.g. Hyderabad, India"
                   className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-600"
                 />
               </div>
@@ -241,13 +306,36 @@ export default function GenerateExperienceLetterPage() {
               </div>
 
               <div className="sm:col-span-2">
-                <label className="font-semibold text-slate-700 block mb-1">Conduct & Appraisal Remarks</label>
+                <label className="font-semibold text-slate-700 block mb-1">Approved Standard Conduct Remarks</label>
                 <textarea
                   rows={2}
                   {...register('conductAppreciation')}
                   className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-600"
                 />
               </div>
+
+              {/* Editable Issuer Additional Statement (Requirement 1C) */}
+              <div className="sm:col-span-2 p-4 bg-slate-50 border border-slate-300 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                    <ShieldCheck className="h-4 w-4 text-blue-600" />
+                    Additional Certificate Statement (Controlled Issuer Remarks)
+                  </span>
+                  <span className="text-[10px] uppercase font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">
+                    CONTROLLED ISSUER SECTION
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Approved standard wording remains as default. Authorized HR issuers can optionally modify or add special professional commendations below. Final wording is permanently frozen in document snapshot.
+                </p>
+                <textarea
+                  rows={3}
+                  {...register('customStatement')}
+                  placeholder="Optional custom professional statement or commendation added by authorized issuer..."
+                  className="w-full p-2.5 border border-slate-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-600"
+                />
+              </div>
+
             </div>
           </div>
 
@@ -258,7 +346,7 @@ export default function GenerateExperienceLetterPage() {
               className="px-4 py-2.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition flex items-center gap-1.5"
             >
               <Eye className="h-4 w-4" />
-              Preview Letter
+              Preview Document
             </button>
             <button
               type="submit"
@@ -266,7 +354,7 @@ export default function GenerateExperienceLetterPage() {
               className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-lg text-xs font-bold transition shadow-sm disabled:opacity-50"
             >
               <CheckCircle2 className="h-4 w-4" />
-              {generating ? 'Submitting...' : 'Generate & Submit for Approval'}
+              {generating ? 'Issuing Certificate...' : 'Generate & Send for Approval'}
             </button>
           </div>
 
@@ -275,7 +363,7 @@ export default function GenerateExperienceLetterPage() {
         <div className="space-y-4">
           <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200">
             <span className="text-xs text-slate-600">
-              Live Preview of official Experience & Relieving Certificate
+              Live Preview of official separation certificate.
             </span>
             <button
               onClick={() => setActiveTab('form')}
@@ -285,12 +373,12 @@ export default function GenerateExperienceLetterPage() {
             </button>
           </div>
 
-          <div className="border border-slate-300 rounded-xl overflow-hidden p-6 bg-slate-200">
+          <div className="border border-slate-300 rounded-xl overflow-hidden p-4 bg-slate-200 flex justify-center">
             <ExperienceLetterTemplate
               data={formValues}
               documentNumber="VAR-EXP-PREVIEW"
               verificationId="VVR-EXP-PREVIEW"
-              verificationUrl="http://localhost:3000/verify/VVR-EXP-PREVIEW"
+              verificationUrl={`${verificationBase}/verify/VVR-EXP-PREVIEW`}
             />
           </div>
         </div>

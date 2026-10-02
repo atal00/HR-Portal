@@ -2,68 +2,45 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Lock, Mail, ShieldCheck, ArrowRight, Sparkles, AlertCircle } from 'lucide-react';
-
-interface DemoAccount {
-  name: string;
-  email: string;
-  role: string;
-  badgeColor: string;
-}
-
-const DEMO_ACCOUNTS: DemoAccount[] = [
-  {
-    name: 'Dr. Vikram Sarabhai',
-    email: 'admin@varsaka.com',
-    role: 'SUPER_ADMIN',
-    badgeColor: 'bg-red-100 text-red-800 border-red-200',
-  },
-  {
-    name: 'Sneha Kulkarni',
-    email: 'hr@varsaka.com',
-    role: 'HR_ADMIN',
-    badgeColor: 'bg-blue-100 text-blue-800 border-blue-200',
-  },
-  {
-    name: 'Rohan Deshmukh',
-    email: 'docs@varsaka.com',
-    role: 'DOCUMENT_ADMIN',
-    badgeColor: 'bg-purple-100 text-purple-800 border-purple-200',
-  },
-  {
-    name: 'Ananya Sharma',
-    email: 'payroll@varsaka.com',
-    role: 'PAYROLL_ADMIN',
-    badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  },
-  {
-    name: 'Karthik Raman',
-    email: 'auditor@varsaka.com',
-    role: 'VIEWER',
-    badgeColor: 'bg-slate-100 text-slate-800 border-slate-200',
-  },
-];
+import { Lock, Mail, ShieldCheck, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('password123');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = async (targetEmail: string) => {
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) {
+      setError('Please enter your company email address.');
+      return;
+    }
+    if (!password) {
+      setError('Please enter your account password.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: targetEmail, password }),
+        body: JSON.stringify({ email: email.trim(), password }),
       });
 
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || 'Authentication failed. Please verify credentials.');
+      }
+
+      if (data.must_change_password || data.redirectTo === '/change-password') {
+        router.push('/change-password');
+        router.refresh();
+        return;
       }
 
       router.push('/dashboard');
@@ -73,15 +50,6 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const onSubmitCustom = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) {
-      setError('Please enter your company email address.');
-      return;
-    }
-    handleLogin(email);
   };
 
   return (
@@ -125,9 +93,9 @@ export default function LoginPage() {
           )}
 
           {/* Form */}
-          <form className="space-y-4" onSubmit={onSubmitCustom}>
+          <form className="space-y-4" onSubmit={handleLogin}>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label htmlFor="email" className="block text-xs font-semibold text-slate-700 mb-1">
                 Company Email Address
               </label>
               <div className="relative rounded-lg shadow-2xs">
@@ -135,17 +103,23 @@ export default function LoginPage() {
                   <Mail className="h-4 w-4 text-slate-400" />
                 </div>
                 <input
+                  id="email"
+                  name="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@varsaka.com"
+                  placeholder="name@varsaka.com"
+                  autoComplete="username"
+                  spellCheck={false}
+                  autoCapitalize="none"
+                  required
                   className="block w-full pl-9.5 pr-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:bg-white focus:outline-hidden transition text-slate-900 placeholder:text-slate-400"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label htmlFor="password" className="block text-xs font-semibold text-slate-700 mb-1">
                 Password
               </label>
               <div className="relative rounded-lg shadow-2xs">
@@ -153,12 +127,30 @@ export default function LoginPage() {
                   <Lock className="h-4 w-4 text-slate-400" />
                 </div>
                 <input
-                  type="password"
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••••"
-                  className="block w-full pl-9.5 pr-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:bg-white focus:outline-hidden transition text-slate-900"
+                  autoComplete="current-password"
+                  required
+                  className="block w-full pl-9.5 pr-10 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:bg-white focus:outline-hidden transition text-slate-900"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-hidden cursor-pointer"
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4 shrink-0 text-slate-500 hover:text-slate-700 transition" />
+                  ) : (
+                    <Eye className="h-4 w-4 shrink-0 text-slate-500 hover:text-slate-700 transition" />
+                  )}
+                </button>
               </div>
             </div>
 
@@ -171,46 +163,10 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* One-Click Role Switcher for QA / Evaluator */}
-          <div className="mt-7 pt-6 border-t border-slate-200">
-            <div className="flex items-center gap-1.5 mb-3">
-              <Sparkles className="h-3.5 w-3.5 text-blue-600" />
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
-                1-Click Role Sandbox Login (QA)
-              </span>
-            </div>
-
-            <div className="space-y-2">
-              {DEMO_ACCOUNTS.map((acc) => (
-                <button
-                  key={acc.email}
-                  type="button"
-                  onClick={() => handleLogin(acc.email)}
-                  disabled={loading}
-                  className="w-full p-2.5 text-left border border-slate-200/90 rounded-xl hover:border-blue-400 hover:bg-blue-50/40 transition flex items-center justify-between group cursor-pointer"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-800 group-hover:text-blue-600 transition">
-                        {acc.name}
-                      </span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold border ${acc.badgeColor}`}>
-                        {acc.role}
-                      </span>
-                    </div>
-                    <span className="text-[10.5px] text-slate-500 font-mono block">
-                      {acc.email}
-                    </span>
-                  </div>
-                  <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition" />
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-4 pt-3 flex items-center justify-center gap-1.5 text-[11px] text-slate-500">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-              <span>End-to-end encrypted session with server-side authorization enforcement.</span>
-            </div>
+          {/* Secure Enterprise Notice */}
+          <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-center gap-1.5 text-[11px] text-slate-500">
+            <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+            <span>End-to-end encrypted session with server-side authorization enforcement.</span>
           </div>
         </div>
       </div>

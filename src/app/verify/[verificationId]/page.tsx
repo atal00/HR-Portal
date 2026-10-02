@@ -12,7 +12,8 @@ import {
   FileText, 
   User, 
   ExternalLink,
-  Lock
+  Lock,
+  Clock
 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -70,8 +71,32 @@ export default async function PublicVerificationPage({ params }: Props) {
             </div>
           )}
 
+          {result.status === 'PENDING_APPROVAL' && (
+            <div className="bg-gradient-to-r from-amber-600 to-yellow-600 text-white p-6 text-center">
+              <div className="inline-flex items-center justify-center p-3 bg-white/20 rounded-full mb-3 backdrop-blur-xs">
+                <Clock className="h-10 w-10 text-white" />
+              </div>
+              <h1 className="text-xl font-bold tracking-tight">DOCUMENT PENDING APPROVAL</h1>
+              <p className="text-xs text-amber-100 mt-1">
+                This document has been submitted and is currently pending authorized approval. It has NOT been officially verified or issued.
+              </p>
+            </div>
+          )}
+
+          {result.status === 'REJECTED' && (
+            <div className="bg-gradient-to-r from-rose-600 to-red-700 text-white p-6 text-center">
+              <div className="inline-flex items-center justify-center p-3 bg-white/20 rounded-full mb-3 backdrop-blur-xs">
+                <XCircle className="h-10 w-10 text-white" />
+              </div>
+              <h1 className="text-xl font-bold tracking-tight">DOCUMENT REJECTED</h1>
+              <p className="text-xs text-rose-100 mt-1">
+                This document was rejected during internal review and is NOT an authentic issued document.
+              </p>
+            </div>
+          )}
+
           {result.status === 'REVOKED' && (
-            <div className="bg-gradient-to-r from-red-600 to-rose-700 text-white p-6 text-center">
+            <div className="bg-gradient-to-r from-red-700 to-slate-900 text-white p-6 text-center">
               <div className="inline-flex items-center justify-center p-3 bg-white/20 rounded-full mb-3 backdrop-blur-xs">
                 <XCircle className="h-10 w-10 text-white" />
               </div>
@@ -83,7 +108,7 @@ export default async function PublicVerificationPage({ params }: Props) {
           )}
 
           {result.status === 'NOT_FOUND' && (
-            <div className="bg-gradient-to-r from-amber-600 to-orange-700 text-white p-6 text-center">
+            <div className="bg-gradient-to-r from-slate-600 to-slate-800 text-white p-6 text-center">
               <div className="inline-flex items-center justify-center p-3 bg-white/20 rounded-full mb-3 backdrop-blur-xs">
                 <AlertTriangle className="h-10 w-10 text-white" />
               </div>
@@ -151,6 +176,66 @@ export default async function PublicVerificationPage({ params }: Props) {
                   </div>
                 </div>
               </>
+            )}
+
+            {result.status === 'PENDING_APPROVAL' && (
+              <div className="space-y-4">
+                <div className="border border-amber-200 bg-amber-50/60 rounded-lg p-4 space-y-3 text-xs">
+                  <div className="flex justify-between border-b border-amber-100 pb-2">
+                    <span className="text-slate-500">Document Title:</span>
+                    <span className="font-bold text-slate-900">{result.document_title}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-amber-100 pb-2">
+                    <span className="text-slate-500">Recipient Name:</span>
+                    <span className="font-bold text-slate-900">{result.candidate_name}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-amber-100 pb-2">
+                    <span className="text-slate-500">Document Type:</span>
+                    <span className="font-semibold text-slate-800">{result.document_type}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-amber-100 pb-2">
+                    <span className="text-slate-500">Verification Token:</span>
+                    <span className="font-mono font-bold text-amber-900">{result.verification_id}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Lifecycle Status:</span>
+                    <span className="font-bold text-amber-700 uppercase">PENDING FORMAL APPROVAL</span>
+                  </div>
+                </div>
+
+                <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-lg text-amber-900 text-xs flex items-start gap-2.5">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="block font-bold">Authenticity Not Established:</strong>
+                    This document draft has not received formal authorization or executive seal from Varsaka Labs. It cannot be used as an official credential.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {result.status === 'REJECTED' && (
+              <div className="space-y-4">
+                <div className="border border-red-200 bg-red-50/50 rounded-lg p-4 space-y-3 text-xs">
+                  <div className="flex justify-between border-b border-red-100 pb-2">
+                    <span className="text-slate-500">Document Title:</span>
+                    <span className="font-bold text-slate-900">{result.document_title}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-red-100 pb-2">
+                    <span className="text-slate-500">Recipient Name:</span>
+                    <span className="font-bold text-slate-900">{result.candidate_name}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-red-100 pb-2">
+                    <span className="text-slate-500">Verification Token:</span>
+                    <span className="font-mono font-bold text-red-900">{result.verification_id}</span>
+                  </div>
+                  <div className="pt-1">
+                    <span className="text-slate-500 block mb-1">Reason for Rejection:</span>
+                    <div className="p-2.5 bg-white border border-red-200 rounded text-red-950 font-medium">
+                      "{result.rejection_reason || 'Document was rejected during approval review.'}"
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
 
             {result.status === 'REVOKED' && (

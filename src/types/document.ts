@@ -1,9 +1,19 @@
-// ==============================================================================
-// Specific Document Schemas & Payloads
-// ==============================================================================
+export interface DocumentSignatorySnapshot {
+  name?: string;
+  title?: string;
+  department?: string;
+  company?: string;
+  signature_url?: string;
+  version?: number;
+}
+
+export interface DocumentStampSnapshot {
+  stamp_url?: string;
+  version?: number;
+}
 
 export interface OfferLetterData {
-  offerType: 'direct-fulltime' | 'fulltime-after-intern' | 'internship';
+  offerType: 'direct-fulltime' | 'fulltime-after-intern' | 'internship' | 'revised-offer';
   offerDate: string;
   candidateName: string;
   candidateAddress: string;
@@ -13,9 +23,24 @@ export interface OfferLetterData {
   employeeCode: string;
   annualCtc: number;
   annualCtcWords: string;
-  bondPeriodMonths: number;
-  bondPenaltyAmount: number;
+  
+  // Employment Bond Decision & Configuration
+  bondIncluded?: boolean;
+  bondPeriodMonths?: number;
+  bondPenaltyAmount?: number;
+  bondTerms?: string;
+  bondEffectiveDate?: string;
   noticePeriodMonths: number;
+  
+  // Controlled Custom Authorized Clause
+  additionalClauses?: string;
+
+  // Salary Hike / Revision Workflow
+  isSalaryRevision?: boolean;
+  previousCtc?: number;
+  revisedCtc?: number;
+  revisionEffectiveDate?: string;
+  previousDocumentNumber?: string;
   
   // Monthly Breakdown
   basic: number;
@@ -35,6 +60,10 @@ export interface OfferLetterData {
   monthlyNetSalary: number;
   yearlyVariable: number;
 
+  // Signatory & Stamp Snapshot
+  signatory?: DocumentSignatorySnapshot;
+  stamp?: DocumentStampSnapshot;
+
   // Internship Specific (if applicable)
   internDuration?: string;
   internStipend?: number;
@@ -49,11 +78,16 @@ export interface ExperienceLetterData {
   department: string;
   joiningDate: string;
   lastWorkingDate: string;
+  tenureText?: string; // e.g. "1 year, 8 months"
   employmentType: string;
   workLocation: string;
   conductAppreciation: string;
+  additionalStatement?: string; // Controlled editable issuer wording
+  customStatement?: string; // Controlled editable issuer wording alias
   authorizedSignatoryName: string;
   authorizedSignatoryTitle: string;
+  signatory?: DocumentSignatorySnapshot;
+  stamp?: DocumentStampSnapshot;
 }
 
 export interface RelievingLetterData {
@@ -64,13 +98,18 @@ export interface RelievingLetterData {
   department: string;
   joiningDate: string;
   lastWorkingDate: string;
+  tenureText?: string; // e.g. "1 year, 8 months"
   employmentType: string;
   workLocation: string;
   resignationDate?: string;
   relievingDate: string;
   clearanceStatus: string;
+  additionalRemarks?: string; // Controlled editable issuer wording
+  customStatement?: string; // Controlled editable issuer wording alias
   authorizedSignatoryName: string;
   authorizedSignatoryTitle: string;
+  signatory?: DocumentSignatorySnapshot;
+  stamp?: DocumentStampSnapshot;
 }
 
 export interface SalarySlipData {
@@ -81,6 +120,7 @@ export interface SalarySlipData {
   designation: string;
   department: string;
   joiningDate: string;
+  bankName?: string;
   bankAccountNumber?: string;
   panNumber?: string;
   pfNumber?: string;
@@ -106,6 +146,8 @@ export interface SalarySlipData {
 
   netSalary: number;
   netSalaryInWords: string;
+  signatory?: DocumentSignatorySnapshot;
+  stamp?: DocumentStampSnapshot;
 }
 
 export interface CertificateData {
@@ -121,4 +163,6 @@ export interface CertificateData {
   authorizedSignatory: string; // "Authorized Signatory, HR Department"
   companyName: string;      // "Varsaka Labs Pvt. Ltd."
   verificationUrl: string;  // canonical URL with verification ID
+  signatory?: DocumentSignatorySnapshot;
+  stamp?: DocumentStampSnapshot;
 }

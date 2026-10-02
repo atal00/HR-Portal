@@ -4,12 +4,15 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { DocumentRecord } from '@/types/database';
+import { SessionUser } from '@/types/auth';
+import { canApproveDocument, hasPermission } from '@/lib/rbac';
 import { formatDate } from '@/lib/utils';
 import { OfferLetterTemplate } from '@/components/documents/OfferLetterTemplate';
 import { ExperienceLetterTemplate } from '@/components/documents/ExperienceLetterTemplate';
 import { RelievingLetterTemplate } from '@/components/documents/RelievingLetterTemplate';
 import { SalarySlipTemplate } from '@/components/documents/SalarySlipTemplate';
 import { CertificateTemplate } from '@/components/documents/CertificateTemplate';
+import { toast } from 'react-hot-toast';
 import {
   FileText,
   ArrowLeft,
@@ -23,7 +26,9 @@ import {
   Ban,
   ExternalLink,
   Lock,
-  Layers
+  Layers,
+  X,
+  AlertCircle
 } from 'lucide-react';
 
 export default function DocumentDetailsPage() {
@@ -31,10 +36,19 @@ export default function DocumentDetailsPage() {
   const router = useRouter();
   const id = params?.id as string;
 
+  const [currentUser, setCurrentUser] = useState<SessionUser | null>(null);
   const [doc, setDoc] = useState<DocumentRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Approval Modal State
+  const [showApproveModal, setShowApproveModal] = useState(false);
+
+  // Rejection Modal State
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectError, setRejectError] = useState('');
 
   // Revocation Modal State
   const [showRevokeModal, setShowRevokeModal] = useState(false);
@@ -47,12 +61,19 @@ export default function DocumentDetailsPage() {
 
   const fetchDoc = async () => {
     try {
-      const res = await fetch(`/api/documents/${id}`);
-      if (res.ok) {
-        const data = await res.json();
+      const [docRes, userRes] = await Promise.all([
+        fetch(`/api/documents/${id}`),
+        fetch('/api/auth/me'),
+      ]);
+      if (docRes.ok) {
+        const data = await docRes.json();
         setDoc(data);
       } else {
         setError('Document record not found');
+      }
+      if (userRes.ok) {
+        const u = await userRes.json();
+        setCurrentUser(u);
       }
     } catch (e: any) {
       setError(e.message);
@@ -66,18 +87,54 @@ export default function DocumentDetailsPage() {
   }, [id]);
 
   const handleApprove = async () => {
-    if (!confirm('Are you sure you want to approve this document? Once approved, the document will be permanently registered and immutable.')) return;
     setActionLoading(true);
     try {
       const res = await fetch(`/api/documents/${id}/approve`, { method: 'POST' });
       if (res.ok) {
+        toast.success('Document approved successfully.');
+        setShowApproveModal(false);
         await fetchDoc();
       } else {
         const d = await res.json();
-        alert(d.error || 'Approval failed');
+        toast.error(d.error || 'Approval failed');
       }
     } catch (e: any) {
-      alert(e.message);
+      toast.error(e.message || 'Error approving document');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleReject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanReason = rejectReason.trim();
+    if (cleanReason.length < 5) {
+      setRejectError('Rejection reason must be at least 5 characters long.');
+      return;
+    }
+    if (cleanReason.length > 500) {
+      setRejectError('Rejection reason cannot exceed 500 characters.');
+      return;
+    }
+
+    setActionLoading(true);
+    setRejectError('');
+    try {
+      const res = await fetch(`/api/documents/${id}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: cleanReason }),
+      });
+      if (res.ok) {
+        toast.success('Document rejected successfully.');
+        setShowRejectModal(false);
+        await fetchDoc();
+      } else {
+        const d = await res.json();
+        setRejectError(d.error || 'Failed to reject document.');
+      }
+    } catch (e: any) {
+      setRejectError(e.message || 'Error rejecting document.');
     } finally {
       setActionLoading(false);
     }
@@ -86,7 +143,7 @@ export default function DocumentDetailsPage() {
   const handleRevoke = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!revokeConfirmed) {
-      alert('Please check the confirmation box.');
+      toast.error('Please check the confirmation box.');
       return;
     }
     setActionLoading(true);
@@ -97,14 +154,15 @@ export default function DocumentDetailsPage() {
         body: JSON.stringify({ reason: revokeReason, confirmation: true }),
       });
       if (res.ok) {
+        toast.success('Document revoked successfully.');
         setShowRevokeModal(false);
         await fetchDoc();
       } else {
         const d = await res.json();
-        alert(d.error || 'Revocation failed');
+        toast.error(d.error || 'Revocation failed');
       }
     } catch (e: any) {
-      alert(e.message);
+      toast.error(e.message || 'Error revoking document');
     } finally {
       setActionLoading(false);
     }
@@ -124,13 +182,15 @@ export default function DocumentDetailsPage() {
       });
       if (res.ok) {
         const newDoc = await res.json();
+        toast.success('New version created successfully.');
+        setShowVersionModal(false);
         router.push(`/documents/${newDoc.id}`);
       } else {
         const d = await res.json();
-        alert(d.error || 'Failed to create new version');
+        toast.error(d.error || 'Failed to create new version');
       }
     } catch (e: any) {
-      alert(e.message);
+      toast.error(e.message || 'Error creating new version');
     } finally {
       setActionLoading(false);
     }
@@ -260,25 +320,51 @@ export default function DocumentDetailsPage() {
             <ExternalLink className="h-3 w-3" />
           </Link>
 
-          {/* Print / Save PDF */}
-          <button
-            onClick={handleDownload}
+          {/* Print / Save PDF Preview Flow */}
+          <Link
+            href={`/documents/${id}/preview`}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-bold transition shadow-xs"
           >
             <Printer className="h-4 w-4 text-slate-600" />
             <span>Print / PDF</span>
-          </button>
+          </Link>
 
-          {/* Workflow Action: Approve if pending */}
+          {/* Workflow Action: Approve & Reject if pending */}
           {isPending && (
-            <button
-              onClick={handleApprove}
-              disabled={actionLoading}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs disabled:opacity-50"
-            >
-              <CheckCircle2 className="h-4 w-4" />
-              <span>Approve Document</span>
-            </button>
+            <>
+              {currentUser && doc && canApproveDocument(currentUser, doc.document_type) ? (
+                <button
+                  onClick={() => setShowApproveModal(true)}
+                  disabled={actionLoading}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs disabled:opacity-50 cursor-pointer"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>Approve Document</span>
+                </button>
+              ) : (
+                <span
+                  title="Approval requires authorized document approval permission (Super Administrator or authorized approver)."
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-100 text-slate-500 text-xs font-semibold border border-slate-200 cursor-not-allowed"
+                >
+                  <Lock className="h-3.5 w-3.5 text-slate-400" />
+                  <span>Awaiting Authorized Approval</span>
+                </span>
+              )}
+              {currentUser && hasPermission(currentUser, 'document.reject') && (
+                <button
+                  onClick={() => {
+                    setShowRejectModal(true);
+                    setRejectReason('');
+                    setRejectError('');
+                  }}
+                  disabled={actionLoading}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 font-bold border border-red-200 text-xs transition disabled:opacity-50 cursor-pointer"
+                >
+                  <XCircle className="h-4 w-4" />
+                  <span>Reject</span>
+                </button>
+              )}
+            </>
           )}
 
           {/* If Approved: Can Create New Version or Revoke */}
@@ -318,17 +404,153 @@ export default function DocumentDetailsPage() {
       )}
 
       {/* Document Render Container */}
-      <div className="bg-slate-200/80 p-4 md:p-8 rounded-xl border border-slate-300 shadow-inner flex justify-center overflow-x-auto">
+      <div className="document-outer-container bg-slate-200/80 p-4 md:p-8 rounded-xl border border-slate-300 shadow-inner flex justify-center overflow-x-auto">
         <div className="w-full">
           {renderTemplate()}
         </div>
       </div>
 
       {/* ======================================================================= */}
+      {/* APPROVE DOCUMENT MODAL                                                  */}
+      {/* ======================================================================= */}
+      {showApproveModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 no-print">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-slate-200 animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-2.5 text-emerald-800 font-bold text-base border-b border-slate-100 pb-3">
+              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+              <span>Approve &amp; Issue Document</span>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Are you sure you want to approve this document? Once approved, the document will be permanently registered, cryptographically sealed, and immutable.
+            </p>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1.5 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Document Number:</span>
+                <span className="font-mono font-bold text-blue-600">{doc.document_number}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Recipient Employee:</span>
+                <span className="font-bold text-slate-900">{doc.employee_name || 'N/A'}</span>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowApproveModal(false)}
+                className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-semibold transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleApprove}
+                disabled={actionLoading}
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold transition disabled:opacity-50 cursor-pointer"
+              >
+                {actionLoading ? 'Approving...' : 'Confirm Approval'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================================= */}
+      {/* REJECT DOCUMENT MODAL                                                   */}
+      {/* ======================================================================= */}
+      {showRejectModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 no-print">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-slate-200 animate-in fade-in zoom-in-95">
+            <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <XCircle className="h-5 w-5 text-red-600" />
+                  Reject Document
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Please provide a reason for rejecting this document.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowRejectModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1.5 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Document Type:</span>
+                <span className="font-semibold text-slate-800">{doc.document_type.replace(/_/g, ' ')}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Document Number:</span>
+                <span className="font-mono font-bold text-blue-600">{doc.document_number}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Employee / Candidate Name:</span>
+                <span className="font-bold text-slate-900">{doc.employee_name || 'N/A'}</span>
+              </div>
+            </div>
+
+            {rejectError && (
+              <div className="flex items-center gap-2 p-2.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg text-xs">
+                <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                <span>{rejectError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleReject} className="space-y-4 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  Rejection Reason <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  rows={4}
+                  required
+                  value={rejectReason}
+                  onChange={(e) => {
+                    setRejectReason(e.target.value);
+                    if (rejectError) setRejectError('');
+                  }}
+                  placeholder="Enter the reason for rejection..."
+                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-red-600 text-slate-900 text-xs"
+                />
+                <div className="text-[10px] text-slate-400 mt-1 flex justify-between">
+                  <span>Minimum 5 characters required</span>
+                  <span>{rejectReason.trim().length} / 500</span>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowRejectModal(false)}
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-semibold transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading || rejectReason.trim().length < 5}
+                  className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold transition disabled:opacity-50 cursor-pointer"
+                >
+                  {actionLoading ? 'Rejecting...' : 'Reject Document'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================================= */}
       {/* REVOCATION MODAL                                                        */}
       {/* ======================================================================= */}
       {showRevokeModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 no-print">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-slate-200 animate-in fade-in zoom-in-95">
             <div className="flex items-center gap-2.5 text-red-600 font-bold text-base border-b border-slate-100 pb-3">
               <Ban className="h-5 w-5" />
@@ -391,7 +613,7 @@ export default function DocumentDetailsPage() {
       {/* NEW VERSION MODAL                                                       */}
       {/* ======================================================================= */}
       {showVersionModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 no-print">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-slate-200 animate-in fade-in zoom-in-95">
             <div className="flex items-center gap-2.5 text-blue-900 font-bold text-base border-b border-slate-100 pb-3">
               <CopyPlus className="h-5 w-5 text-blue-600" />

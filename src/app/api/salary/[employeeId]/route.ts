@@ -63,6 +63,26 @@ export async function PUT(
     }
 
     const { employeeId } = await params;
+
+    // Server-side validation: Inactive/Separated employees cannot have payroll modified
+    const emp = await db.employees.getById(employeeId);
+    if (!emp) {
+      return NextResponse.json({ error: 'Associated employee record not found.' }, { status: 404 });
+    }
+
+    if (emp.status === 'INACTIVE' || emp.status === 'SEPARATED' || emp.deletion_status === 'DELETED') {
+      await logSecurityEvent({
+        eventType: 'UNAUTHORIZED_ACCESS',
+        severity: 'MEDIUM',
+        description: `User ${user.email} attempted to process or update salary for inactive/separated employee ${emp.employee_id} (${emp.full_name}).`,
+        userId: user.id,
+      });
+      return NextResponse.json(
+        { error: `Forbidden: Cannot modify or process payroll for inactive or separated employee (${emp.employee_id} - ${emp.full_name}). Historical payroll records remain preserved under audit retention.` },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
 
     const updated = await db.salary.upsert({

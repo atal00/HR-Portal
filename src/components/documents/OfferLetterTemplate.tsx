@@ -17,14 +17,23 @@ export const OfferLetterTemplate: React.FC<Props> = ({
   verificationUrl = 'http://localhost:3000/verify/VVR-OFF-PREVIEW',
 }) => {
   const firstName = data.candidateName.split(' ')[0] || data.candidateName;
+  const signatureUrl = data.signatory?.signature_url !== undefined 
+    ? data.signatory.signature_url 
+    : '/brand/sign.jpeg';
+  const stampUrl = data.stamp?.stamp_url !== undefined 
+    ? data.stamp.stamp_url 
+    : '/brand/varsaka-seal.png';
+  const signatoryName = data.signatory?.name || 'Authorized Signatory';
+  const signatoryTitle = data.signatory?.title || 'HR Operations / Talent Acquisition';
+  const companyName = data.signatory?.company || 'Varsaka Labs Pvt. Ltd.';
 
   return (
-    <div className="bg-white text-slate-900 font-sans text-[11pt] leading-relaxed max-w-[850px] mx-auto shadow-sm print:shadow-none print:max-w-full">
+    <div className="document-inner-wrapper text-slate-900 font-sans text-[10pt] leading-relaxed">
       
       {/* ========================================================================= */}
       {/* PAGE 1: OFFER LETTER COVER & INTRODUCTION                                */}
       {/* ========================================================================= */}
-      <div className="min-h-[1120px] p-12 flex flex-col justify-between border-b border-slate-200 print:border-none page-break-after">
+      <div className="a4-page">
         <div>
           {/* Header */}
           <div className="flex items-center justify-between border-b-2 border-blue-900 pb-4 mb-6">
@@ -40,7 +49,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
               <div>
                 <h1 className="text-2xl font-black text-blue-950 tracking-wider">VARSAKA LABS</h1>
                 <p className="text-xs font-semibold text-blue-700 uppercase tracking-widest">
-                  {data.offerType === 'internship' ? 'Internship Offer Letter' : 'Full-Time Employment Offer'}
+                  {data.offerType === 'internship' ? 'Internship Offer Letter' : data.isSalaryRevision ? 'Compensation Revision Offer Letter' : 'Full-Time Employment Offer'}
                 </p>
               </div>
             </div>
@@ -77,6 +86,18 @@ export const OfferLetterTemplate: React.FC<Props> = ({
                 </p>
                 <p>
                   If you wish to terminate this internship before completion, a notice period of <strong>{data.internNoticePeriod || '15 days'}</strong> must be served.
+                </p>
+              </>
+            ) : data.isSalaryRevision ? (
+              <>
+                <p>
+                  We are pleased to issue this formal <strong>Employment & Compensation Revision</strong> for your continued role as <strong>{data.designation}</strong> in the <strong>{data.department}</strong> department, effective from <strong>{formatDate(data.revisionEffectiveDate || data.joiningDate)}</strong>.
+                </p>
+                <p>
+                  Under this structured revision, your annual compensation is updated to an annual CTC of <strong>{formatCurrency(data.annualCtc)} ({data.annualCtcWords})</strong>{data.previousCtc ? ` (previously ${formatCurrency(data.previousCtc)})` : ''}. Please refer to <strong>Annexure 1A</strong> for the revised monthly emoluments and statutory contributions.
+                </p>
+                <p>
+                  All underlying terms and conditions, intellectual property covenants, and non-disclosure obligations of your original employment contract remain in full force and effect.
                 </p>
               </>
             ) : (
@@ -122,7 +143,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
       {/* ========================================================================= */}
       {/* PAGE 2: BOND PERIOD & ACCEPTANCE SIGNATURES                              */}
       {/* ========================================================================= */}
-      <div className="min-h-[1120px] p-12 flex flex-col justify-between border-b border-slate-200 print:border-none page-break-after">
+      <div className="a4-page">
         <div>
           <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-6">
             <img 
@@ -141,13 +162,36 @@ export const OfferLetterTemplate: React.FC<Props> = ({
               We expect that your commitment, dedication, and technical expertise will drive the organization to greater heights and provide growth opportunities for you on the professional front. We are confident that you and Varsaka Labs will make a great team going forward. If you have any questions, please do not hesitate to contact us.
             </p>
 
-            <div className="bg-blue-50/60 border border-blue-200 p-4 rounded-md my-4">
-              <h3 className="font-bold text-blue-950 underline mb-2">Bond Period: {data.bondPeriodMonths || 24} months</h3>
-              <ul className="list-disc pl-5 space-y-1 text-xs text-blue-900">
-                <li>You will sign the bond period of <strong>{data.bondPeriodMonths || 24} months</strong> from your date of joining in the organization.</li>
-                <li>You must pay the company <strong>{formatCurrency(data.bondPenaltyAmount || 300000)}</strong> if the bond is broken by you.</li>
-              </ul>
-            </div>
+            {/* Controlled Bond Clause (Only rendered if bondIncluded is explicitly true) */}
+            {data.bondIncluded === true && (
+              <div className="bg-blue-50/60 border border-blue-200 p-4 rounded-md my-4">
+                <h3 className="font-bold text-blue-950 underline mb-2">
+                  Employment Bond Clause: {data.bondPeriodMonths || 24} months
+                </h3>
+                {data.bondTerms ? (
+                  <p className="text-xs text-blue-950 whitespace-pre-line leading-relaxed">
+                    {data.bondTerms}
+                  </p>
+                ) : (
+                  <ul className="list-disc pl-5 space-y-1 text-xs text-blue-900">
+                    <li>You will sign the bond period of <strong>{data.bondPeriodMonths || 24} months</strong> from your date of joining in the organization.</li>
+                    <li>You must pay the company <strong>{formatCurrency(data.bondPenaltyAmount || 300000)}</strong> if the bond is broken by you.</li>
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {/* Controlled Custom Authorized Clause */}
+            {data.additionalClauses && (
+              <div className="bg-slate-50 border border-slate-300 p-4 rounded-md my-4">
+                <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wide mb-1.5">
+                  Additional Authorized Employment Terms
+                </h3>
+                <div className="text-xs text-slate-800 whitespace-pre-line leading-relaxed">
+                  {data.additionalClauses}
+                </div>
+              </div>
+            )}
 
             <p>
               Please send us an email confirming receipt of this offer letter as a token of acceptance of the terms and conditions mentioned therein.
@@ -162,20 +206,33 @@ export const OfferLetterTemplate: React.FC<Props> = ({
             </div>
 
             {/* Dual Signatures */}
-            <div className="pt-16 flex items-end justify-between">
-              <div className="w-64 border-t border-slate-900 pt-2 text-xs">
-                <div className="h-12 flex items-center">
-                  <img 
-                    src="/brand/sign.jpeg" 
-                    alt="Sign" 
-                    width={100}
-                    height={40}
-                    style={{ height: '40px', width: 'auto', maxHeight: '40px' }}
-                    className="h-10 w-auto opacity-80" 
-                  />
+            <div className="pt-10 flex items-end justify-between">
+              <div className="w-64 border-t border-slate-900 pt-2 text-xs relative">
+                <div className="h-12 flex items-center gap-2 relative">
+                  {signatureUrl && (
+                    <img 
+                      src={signatureUrl} 
+                      alt="Authorized Signature" 
+                      width={100}
+                      height={40}
+                      style={{ height: '40px', width: 'auto', maxHeight: '40px' }}
+                      className="h-10 w-auto opacity-90 object-contain relative z-10" 
+                    />
+                  )}
+                  {stampUrl && (
+                    <img 
+                      src={stampUrl} 
+                      alt="Official Seal" 
+                      width={50}
+                      height={50}
+                      style={{ height: '48px', width: 'auto', maxHeight: '48px' }}
+                      className="h-12 w-auto opacity-80 object-contain ml-2" 
+                    />
+                  )}
                 </div>
-                <div className="font-bold text-blue-950 uppercase tracking-wide">Authorized Signatory</div>
-                <div className="text-slate-600">Varsaka Labs Pvt. Ltd.</div>
+                <div className="font-bold text-blue-950 uppercase tracking-wide">{signatoryName}</div>
+                <div className="text-slate-700 font-semibold">{signatoryTitle}</div>
+                <div className="text-slate-600">{companyName}</div>
                 <div className="text-[8pt] text-slate-400 italic">(Signature & Corporate Seal)</div>
               </div>
 
@@ -198,7 +255,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
       {/* ========================================================================= */}
       {/* PAGE 3: ANNEXURE I A - SALARY STRUCTURE                                 */}
       {/* ========================================================================= */}
-      <div className="min-h-[1120px] p-12 flex flex-col justify-between border-b border-slate-200 print:border-none page-break-after">
+      <div className="a4-page">
         <div>
           <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
             <img 
@@ -314,7 +371,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
       {/* ========================================================================= */}
       {/* PAGE 4: ANNEXURE I B - DOCUMENT CHECKLIST                                */}
       {/* ========================================================================= */}
-      <div className="min-h-[1120px] p-12 flex flex-col justify-between border-b border-slate-200 print:border-none page-break-after">
+      <div className="a4-page">
         <div>
           <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
             <img 
@@ -380,7 +437,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
       {/* ========================================================================= */}
       {/* PAGES 5-9: ANNEXURE II A - TERMS AND CONDITIONS                          */}
       {/* ========================================================================= */}
-      <div className="min-h-[1120px] p-12 flex flex-col justify-between border-b border-slate-200 print:border-none page-break-after">
+      <div className="a4-page">
         <div>
           <h2 className="text-base font-bold text-blue-950 underline mb-4">
             Annexure II A: Terms and Conditions of Employment (Part 1)
@@ -399,7 +456,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
         </div>
       </div>
 
-      <div className="min-h-[1120px] p-12 flex flex-col justify-between border-b border-slate-200 print:border-none page-break-after">
+      <div className="a4-page">
         <div>
           <h2 className="text-base font-bold text-blue-950 underline mb-4">
             Annexure II A: Terms and Conditions of Employment (Part 2)
@@ -417,7 +474,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
         </div>
       </div>
 
-      <div className="min-h-[1120px] p-12 flex flex-col justify-between border-b border-slate-200 print:border-none page-break-after">
+      <div className="a4-page">
         <div>
           <h2 className="text-base font-bold text-blue-950 underline mb-4">
             Annexure II A: Terms and Conditions of Employment (Part 3)
@@ -442,7 +499,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
         </div>
       </div>
 
-      <div className="min-h-[1120px] p-12 flex flex-col justify-between border-b border-slate-200 print:border-none page-break-after">
+      <div className="a4-page">
         <div>
           <h2 className="text-base font-bold text-blue-950 underline mb-4">
             Annexure II A: Terms and Conditions of Employment (Part 4)
@@ -462,7 +519,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
         </div>
       </div>
 
-      <div className="min-h-[1120px] p-12 flex flex-col justify-between border-b border-slate-200 print:border-none page-break-after">
+      <div className="a4-page">
         <div>
           <h2 className="text-base font-bold text-blue-950 underline mb-4">
             Annexure II A: Terms and Conditions of Employment (Part 5 - Acceptance)
@@ -494,7 +551,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
       {/* ========================================================================= */}
       {/* PAGES 10-11: ANNEXURE II B - CONFIDENTIALITY & NDA                       */}
       {/* ========================================================================= */}
-      <div className="min-h-[1120px] p-12 flex flex-col justify-between border-b border-slate-200 print:border-none page-break-after">
+      <div className="a4-page">
         <div>
           <h2 className="text-base font-bold text-blue-950 underline mb-4">
             Annexure II B: Confidentiality and Non-Disclosure Agreement (Part 1)
@@ -516,7 +573,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
         </div>
       </div>
 
-      <div className="min-h-[1120px] p-12 flex flex-col justify-between border-b border-slate-200 print:border-none page-break-after">
+      <div className="a4-page">
         <div>
           <h2 className="text-base font-bold text-blue-950 underline mb-4">
             Annexure II B: Confidentiality and Non-Disclosure Agreement (Part 2)
@@ -546,7 +603,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
       {/* ========================================================================= */}
       {/* PAGE 12: ANNEXURE II C - WORK FROM HOME GUIDELINES                       */}
       {/* ========================================================================= */}
-      <div className="min-h-[1120px] p-12 flex flex-col justify-between border-b border-slate-200 print:border-none page-break-after">
+      <div className="a4-page">
         <div>
           <h2 className="text-base font-bold text-blue-950 underline mb-4">
             Annexure II C: Work From Home Guidelines Acceptance & Agreement
@@ -589,7 +646,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
       {/* ========================================================================= */}
       {/* PAGES 13-14: ANNEXURE II D - SOCIAL MEDIA GUIDELINES                     */}
       {/* ========================================================================= */}
-      <div className="min-h-[1120px] p-12 flex flex-col justify-between border-b border-slate-200 print:border-none page-break-after">
+      <div className="a4-page">
         <div>
           <h2 className="text-base font-bold text-blue-950 underline mb-4">
             Annexure II D: Social Media Guidelines and Agreement (Part 1)
@@ -606,7 +663,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
         </div>
       </div>
 
-      <div className="min-h-[1120px] p-12 flex flex-col justify-between border-b border-slate-200 print:border-none page-break-after">
+      <div className="a4-page">
         <div>
           <h2 className="text-base font-bold text-blue-950 underline mb-4">
             Annexure II D: Social Media Guidelines and Agreement (Part 2)
@@ -636,7 +693,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
       {/* ========================================================================= */}
       {/* PAGE 15: ANNEXURE III A - JOB DESCRIPTION                                */}
       {/* ========================================================================= */}
-      <div className="min-h-[1120px] p-12 flex flex-col justify-between border-b border-slate-200 print:border-none page-break-after">
+      <div className="a4-page">
         <div>
           <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
             <img 
@@ -684,7 +741,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
       {/* ========================================================================= */}
       {/* PAGE 16: ANNEXURE III B - PERFORMANCE MEASUREMENT & QR VERIFICATION      */}
       {/* ========================================================================= */}
-      <div className="min-h-[1120px] p-12 flex flex-col justify-between print:border-none">
+      <div className="a4-page a4-page-last">
         <div>
           <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
             <img 
