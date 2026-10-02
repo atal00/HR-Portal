@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
+import { cache } from 'react';
 import { SessionUser } from '@/types/auth';
 import { PermissionCode } from '@/types/database';
 import { hasPermission } from './rbac';
@@ -26,7 +27,7 @@ export function verifySessionToken(token: string): SessionUser | null {
     const parsed = JSON.parse(Buffer.from(base64Data, 'base64url').toString('utf-8'));
     if (Date.now() > parsed.expiresAt) return null;
 
-    return parsed.user;
+    return parsed.user || null;
   } catch {
     return null;
   }
@@ -36,8 +37,9 @@ export function verifySessionToken(token: string): SessionUser | null {
  * Server-side getter for authenticated user session from HTTP cookies.
  * Validates session signature, user active status, session_version,
  * and derives authoritative role and permissions from the database.
+ * Wrapped in React.cache() for request-scoped deduplication across Server Components.
  */
-export async function getCurrentUser(): Promise<SessionUser | null> {
+export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
   try {
     const cookieStore = await cookies();
     const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
@@ -48,18 +50,27 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
 
     // Dynamic import to prevent circular dependency with db.ts
     const { db } = await import('@/lib/db');
-    const dbUser = await db.users.getById(sessionUser.id);
+
+    // Run user lookup and MFA status check concurrently in parallel
+    const [dbUser, userMfa] = await Promise.all([
+      db.users.getById(sessionUser.id),
+      db.userMfa.getByUserId(sessionUser.id),
+    ]);
+
     if (!dbUser || !dbUser.is_active) {
       return null;
     }
 
-    // Validate authoritative session_version
-    const currentVersion = await db.userCredentials.getSessionVersion(sessionUser.id);
+    // Authoritative session_version is already loaded onto dbUser by db.users.getById
+    const currentVersion = dbUser.session_version ?? null;
     if (currentVersion !== null) {
       if (!sessionUser.session_version || sessionUser.session_version !== currentVersion) {
         return null;
       }
     }
+
+    // Authoritative MFA status check
+    const isMfaEnabled = Boolean(userMfa && userMfa.is_enabled && userMfa.is_verified);
 
     // Authoritative server-side role and permissions
     return {
@@ -71,11 +82,12 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
       department: dbUser.department,
       must_change_password: dbUser.must_change_password ?? false,
       session_version: currentVersion ?? sessionUser.session_version,
+      mfa_enabled: isMfaEnabled,
     };
   } catch {
     return null;
   }
-}
+});
 
 export class AuthError extends Error {
   status: number;
@@ -89,13 +101,19 @@ export class AuthError extends Error {
 /**
  * Server-side guard requiring authentication
  */
-export async function requireAuthUser(options: { allowPendingPasswordChange?: boolean } = {}): Promise<SessionUser> {
+export async function requireAuthUser(options: { 
+  allowPendingPasswordChange?: boolean;
+  allowPendingMfaSetup?: boolean;
+} = {}): Promise<SessionUser> {
   const user = await getCurrentUser();
   if (!user) {
     throw new AuthError('UNAUTHORIZED: Authentication session required.', 401);
   }
   if (user.must_change_password && !options.allowPendingPasswordChange) {
     throw new AuthError('PASSWORD_CHANGE_REQUIRED: Mandatory password change required before accessing portal.', 403);
+  }
+  if (!user.mfa_enabled && !options.allowPendingMfaSetup) {
+    throw new AuthError('MFA_ENROLLMENT_REQUIRED: Mandatory MFA enrollment required before accessing portal.', 403);
   }
   return user;
 }

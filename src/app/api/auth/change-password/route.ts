@@ -5,8 +5,11 @@ import { validatePasswordPolicy } from '@/lib/password';
 
 export async function POST(req: NextRequest) {
   try {
-    // allow pending password change users to call this endpoint
-    const sessionUser = await requireAuthUser({ allowPendingPasswordChange: true });
+    // allow pending password change and un-enrolled MFA users to call this endpoint
+    const sessionUser = await requireAuthUser({ 
+      allowPendingPasswordChange: true, 
+      allowPendingMfaSetup: true 
+    });
 
     const body = await req.json();
     const { currentPassword, newPassword, confirmPassword } = body;
@@ -44,9 +47,14 @@ export async function POST(req: NextRequest) {
       session_version: newSessionVersion || 1,
     });
 
+    const userMfa = await db.userMfa.getByUserId(sessionUser.id);
+    const isMfaEnabled = Boolean(userMfa && userMfa.is_enabled && userMfa.is_verified);
+
     const res = NextResponse.json({
       success: true,
-      message: 'Password changed successfully. You can now access the portal.',
+      message: isMfaEnabled
+        ? 'Password changed successfully. You can now access the portal.'
+        : 'Password changed successfully. Multi-factor authentication setup is required before accessing the portal.',
       user: {
         id: sessionUser.id,
         email: sessionUser.email,
@@ -54,7 +62,11 @@ export async function POST(req: NextRequest) {
         role: refreshedUser?.role || sessionUser.role,
         permissions: refreshedUser?.permissions || sessionUser.permissions,
         must_change_password: false,
+        mfa_enabled: isMfaEnabled,
       },
+      must_change_password: false,
+      mfa_enabled: isMfaEnabled,
+      redirectTo: isMfaEnabled ? '/dashboard' : '/mfa-setup',
     });
 
     res.cookies.set({

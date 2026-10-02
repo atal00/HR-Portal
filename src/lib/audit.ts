@@ -64,6 +64,14 @@ export async function logAuditEvent(params: AuditParams): Promise<AuditLog> {
   delete cleanMetadata.secret;
   delete cleanMetadata.apiKey;
   delete cleanMetadata.serviceRoleKey;
+  delete cleanMetadata.totpSecret;
+  delete cleanMetadata.mfaSecret;
+  delete cleanMetadata.manualKey;
+  delete cleanMetadata.secret_encrypted;
+  delete cleanMetadata.otp;
+  delete cleanMetadata.code;
+  delete cleanMetadata.recoveryCode;
+  delete cleanMetadata.recoveryCodes;
 
   // Mask sensitive financial identifiers if present in metadata
   if (typeof cleanMetadata.panNumber === 'string' && cleanMetadata.panNumber.length >= 6) {
@@ -147,6 +155,21 @@ export async function logAuditEvent(params: AuditParams): Promise<AuditLog> {
  * Logs a high-priority security incident or access anomaly
  */
 export async function logSecurityEvent(params: SecurityParams): Promise<SecurityLog> {
+  const cleanSecMetadata = { ...params.metadata };
+  delete cleanSecMetadata.password;
+  delete cleanSecMetadata.token;
+  delete cleanSecMetadata.secret;
+  delete cleanSecMetadata.apiKey;
+  delete cleanSecMetadata.serviceRoleKey;
+  delete cleanSecMetadata.totpSecret;
+  delete cleanSecMetadata.mfaSecret;
+  delete cleanSecMetadata.manualKey;
+  delete cleanSecMetadata.secret_encrypted;
+  delete cleanSecMetadata.otp;
+  delete cleanSecMetadata.code;
+  delete cleanSecMetadata.recoveryCode;
+  delete cleanSecMetadata.recoveryCodes;
+
   const inMemorySecLog: SecurityLog = {
     id: `sec-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     event_type: params.eventType,
@@ -155,7 +178,7 @@ export async function logSecurityEvent(params: SecurityParams): Promise<Security
     user_id: params.userId,
     ip_address: params.ipAddress || '127.0.0.1',
     user_agent: params.userAgent || 'Portal-Client/1.0',
-    metadata: params.metadata || {},
+    metadata: cleanSecMetadata,
     created_at: new Date().toISOString(),
   };
 
@@ -172,7 +195,7 @@ export async function logSecurityEvent(params: SecurityParams): Promise<Security
           user_id: dbUserId,
           ip_address: params.ipAddress || '127.0.0.1',
           user_agent: params.userAgent || 'Portal-Client/1.0',
-          metadata: params.metadata || {},
+          metadata: cleanSecMetadata,
         })
         .select('*')
         .single();

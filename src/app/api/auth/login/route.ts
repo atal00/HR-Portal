@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { signSessionPayload, AUTH_COOKIE } from '@/lib/auth';
+import { signMfaChallenge, verifyMfaChallenge, MFA_CHALLENGE_COOKIE } from '@/lib/mfa';
 import { logAuditEvent, logSecurityEvent } from '@/lib/audit';
 import { rateLimiter } from '@/lib/rate-limit';
 import { verifyPassword } from '@/lib/password';
@@ -216,28 +217,161 @@ export async function POST(req: NextRequest) {
     }
 
     // Step 7: Resolve permissions server-side (user.permissions already resolved by db.users.getByEmail)
-    // Step 8: Reset failed attempts on success
+    // Step 8: Reset password-level failed attempts on password success
     rateLimiter.reset(rateLimitKey);
     await db.userCredentials.resetFailedAttempts(user.id);
 
-    // Create secure server-side session
+    // Step 8.5: Authoritative MFA State Check (Fail-Closed)
+    let userMfa = null;
+    try {
+      userMfa = await db.userMfa.getByUserId(user.id);
+    } catch (mfaDbErr: any) {
+      await logSecurityEvent({
+        eventType: 'MFA_FAILURE',
+        severity: 'CRITICAL',
+        description: `MFA database lookup failed during login for ${email}: ${mfaDbErr.message}`,
+        userId: user.id,
+        ipAddress: ip,
+        userAgent,
+        metadata: { reason_category: 'MFA_DATABASE_UNAVAILABLE' },
+      });
+
+      return NextResponse.json(
+        { error: 'Authentication service temporarily unavailable. Please try again later.' },
+        { status: 503 }
+      );
+    }
+
+    if (userMfa && userMfa.is_enabled && userMfa.is_verified) {
+      // Check if MFA factor is locked
+      if (userMfa.locked_until) {
+        const lockExpiresAt = new Date(userMfa.locked_until).getTime();
+        if (Date.now() < lockExpiresAt) {
+          const remainingSeconds = Math.ceil((lockExpiresAt - Date.now()) / 1000);
+          await logSecurityEvent({
+            eventType: 'MFA_LOCKED',
+            severity: 'HIGH',
+            description: `LOGIN_CHALLENGE_BLOCKED: MFA locked for user ${user.id} (${email})`,
+            userId: user.id,
+            ipAddress: ip,
+            userAgent,
+            metadata: { reason_category: 'MFA_LOCKED', user_id: user.id, remaining_seconds: remainingSeconds },
+          });
+
+          return NextResponse.json(
+            { error: `Too many failed authenticator attempts. MFA locked. Please try again in ${remainingSeconds} seconds.` },
+            {
+              status: 423,
+              headers: { 'Retry-After': String(remainingSeconds) },
+            }
+          );
+        } else {
+          // Lockout expired, reset failed attempts
+          await db.userMfa.resetFailedAttempts(user.id);
+        }
+      }
+
+      // Generate short-lived (5 min) signed MFA challenge token
+      const challengeToken = signMfaChallenge({ userId: user.id, email: user.email });
+      const challengeInfo = verifyMfaChallenge(challengeToken);
+      if (challengeInfo?.nonce) {
+        await db.userMfa.setChallengeNonce(user.id, challengeInfo.nonce);
+      }
+
+      await logAuditEvent({
+        userId: user.id,
+        userEmail: user.email,
+        action: 'MFA_LOGIN_CHALLENGE',
+        resourceType: 'AUTH_MFA',
+        resourceId: user.id,
+        metadata: { method: 'totp' },
+        ipAddress: ip,
+        userAgent,
+      });
+
+      const res = NextResponse.json({
+        requiresMfa: true,
+        challengeId: challengeToken,
+        email: user.email,
+      });
+
+      res.cookies.set({
+        name: MFA_CHALLENGE_COOKIE.name,
+        value: challengeToken,
+        ...MFA_CHALLENGE_COOKIE.options,
+      });
+
+      return res;
+    }
+
+    // Step 8.6: Routing determination based on mandatory security policy
+    // Branch 1: Temporary password requires immediate password change
+    if (cred.must_change_password) {
+      const sessionToken = signSessionPayload({
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name,
+        role: user.role,
+        permissions: user.permissions,
+        must_change_password: true,
+        session_version: cred.session_version,
+      });
+
+      await logAuditEvent({
+        userId: user.id,
+        userEmail: user.email,
+        action: 'LOGIN_TEMP_PASSWORD',
+        resourceType: 'AUTH',
+        resourceId: user.id,
+        metadata: { role: user.role, must_change_password: true },
+        ipAddress: ip,
+        userAgent,
+      });
+
+      const res = NextResponse.json({
+        success: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          full_name: user.full_name,
+          role: user.role,
+          permissions: user.permissions,
+          must_change_password: true,
+          mfa_enabled: false,
+        },
+        must_change_password: true,
+        mfa_enabled: false,
+        redirectTo: '/change-password',
+      });
+
+      res.cookies.set({
+        name: AUTH_COOKIE.name,
+        value: sessionToken,
+        ...AUTH_COOKIE.options,
+      });
+
+      return res;
+    }
+
+    // Branch 2: MFA is NOT configured -> MANDATORY MFA ENROLLMENT
+    // User must be forced to /mfa-setup. Normal dashboard access is strictly blocked.
     const sessionToken = signSessionPayload({
       id: user.id,
       email: user.email,
       full_name: user.full_name,
       role: user.role,
       permissions: user.permissions,
-      must_change_password: cred.must_change_password,
+      must_change_password: false,
       session_version: cred.session_version,
     });
 
     await logAuditEvent({
       userId: user.id,
       userEmail: user.email,
-      action: 'LOGIN_SUCCESS',
-      resourceType: 'AUTH',
+      action: 'MFA_ENROLLMENT_REQUIRED',
+      resourceType: 'AUTH_MFA',
       resourceId: user.id,
-      metadata: { role: user.role, must_change_password: cred.must_change_password, session_version: cred.session_version },
+      metadata: { role: user.role, mfa_enrolled: false },
       ipAddress: ip,
       userAgent,
     });
@@ -250,10 +384,12 @@ export async function POST(req: NextRequest) {
         full_name: user.full_name,
         role: user.role,
         permissions: user.permissions,
-        must_change_password: cred.must_change_password ?? false,
+        must_change_password: false,
+        mfa_enabled: false,
       },
-      must_change_password: cred.must_change_password ?? false,
-      redirectTo: cred.must_change_password ? '/change-password' : '/dashboard',
+      must_change_password: false,
+      mfa_enabled: false,
+      redirectTo: '/mfa-setup',
     });
 
     res.cookies.set({

@@ -14,8 +14,12 @@ import {
   Clock,
   RefreshCw,
   FileCheck,
+  Smartphone,
+  X,
 } from 'lucide-react';
 import { DocumentBrandingSettings } from '@/lib/branding';
+import MfaEnrollmentCard from '@/components/auth/MfaEnrollmentCard';
+import { formatDate } from '@/lib/utils';
 
 export default function SettingsPage() {
   const [branding, setBranding] = useState<DocumentBrandingSettings | null>(null);
@@ -24,6 +28,8 @@ export default function SettingsPage() {
   const [uploadingSig, setUploadingSig] = useState(false);
   const [uploadingStamp, setUploadingStamp] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [mfaStatus, setMfaStatus] = useState<{ isEnabled: boolean; isVerified: boolean; lastUsedAt: string | null } | null>(null);
+  const [mfaModalOpen, setMfaModalOpen] = useState(false);
 
   const sigFileInputRef = useRef<HTMLInputElement>(null);
   const stampFileInputRef = useRef<HTMLInputElement>(null);
@@ -86,8 +92,21 @@ export default function SettingsPage() {
     }
   };
 
+  const fetchMfaStatus = async () => {
+    try {
+      const res = await fetch('/api/auth/mfa/status');
+      if (res.ok) {
+        const data = await res.json();
+        setMfaStatus(data);
+      }
+    } catch (e) {
+      console.error('Failed to load MFA status:', e);
+    }
+  };
+
   useEffect(() => {
     fetchBranding();
+    fetchMfaStatus();
   }, []);
 
   const handleSaveCorporateMetadata = async (e: React.FormEvent) => {
@@ -626,6 +645,67 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {/* ================================================================= */}
+        {/* SECURITY & TWO-FACTOR AUTHENTICATION (TOTP)                       */}
+        {/* ================================================================= */}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-3 gap-2">
+            <h2 className="text-sm font-bold text-blue-950 flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-blue-600" />
+              SECURITY &amp; TWO-FACTOR AUTHENTICATION (TOTP)
+            </h2>
+            <span className="text-[11px] text-slate-400 font-medium">
+              Standard: RFC 6238 TOTP
+            </span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50">
+            <div className="flex items-start gap-3">
+              <div className={`p-2.5 rounded-xl shrink-0 ${mfaStatus?.isEnabled ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-amber-50 text-amber-600 border border-amber-200'}`}>
+                <Smartphone className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xs font-bold text-slate-900">Authenticator App MFA</h3>
+                  {mfaStatus?.isEnabled ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Active &amp; Enrolled
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                      <AlertCircle className="h-3 w-3" />
+                      Not Enrolled
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed max-w-xl">
+                  {mfaStatus?.isEnabled
+                    ? 'Your account is secured with a time-based one-time password (TOTP). Compatible with Google Authenticator, Microsoft Authenticator, and Authy.'
+                    : 'Add an extra layer of security to your Varsaka HR account. A 6-digit verification code from your authenticator app will be required at login.'}
+                </p>
+                {mfaStatus?.lastUsedAt && (
+                  <span className="text-[10px] text-slate-400 block mt-1">
+                    Last authenticated via TOTP: {formatDate(mfaStatus.lastUsedAt)}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setMfaModalOpen(true)}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition shadow-xs shrink-0 cursor-pointer ${
+                mfaStatus?.isEnabled
+                  ? 'border border-slate-300 bg-white hover:bg-slate-50 text-slate-700'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+              }`}
+            >
+              {mfaStatus?.isEnabled ? 'Reconfigure Authenticator' : 'Set Up Authenticator'}
+            </button>
+          </div>
+        </div>
+
       </div>
 
       {/* Edit Corporate Metadata Modal (Requirement 8) */}
@@ -731,6 +811,33 @@ export default function SettingsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MFA Enrollment Modal */}
+      {mfaModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 relative">
+            <button
+              type="button"
+              onClick={() => {
+                setMfaModalOpen(false);
+                fetchMfaStatus();
+              }}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <MfaEnrollmentCard
+              title="Configure Authenticator MFA"
+              subtitle="Scan the QR code with Google Authenticator, Microsoft Authenticator, or Authy."
+              onSuccess={() => {
+                setMfaModalOpen(false);
+                fetchMfaStatus();
+                setMessage({ type: 'success', text: 'Authenticator configured successfully!' });
+              }}
+            />
           </div>
         </div>
       )}

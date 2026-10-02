@@ -24,10 +24,13 @@ import {
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
-  const user = await getCurrentUser();
-  const employees = await db.employees.list();
-  const documents = await db.documents.list();
-  const auditLogs = await db.auditLogs.list(5);
+  const [user, employees, documents, auditLogs, certRequests] = await Promise.all([
+    getCurrentUser(),
+    db.employees.list(),
+    db.documents.list(),
+    db.auditLogs.list(5),
+    db.certificateRequests.list(),
+  ]);
 
   const totalEmployees = employees.length;
   const activeEmployees = employees.filter((e) => e.status === 'ACTIVE' || e.status === 'INTERN').length;
@@ -35,6 +38,9 @@ export default async function DashboardPage() {
   const pendingApprovals = documents.filter((d) => d.status === 'PENDING_APPROVAL').length;
 
   const recentDocuments = documents.slice(0, 5);
+
+  const pendingCertRequests = (certRequests || []).filter((r) => r.status === 'PENDING');
+  const pendingEmployees = employees.filter((e) => e.deletion_status === 'DELETION_REQUESTED');
 
   return (
     <div className="space-y-8">
@@ -79,7 +85,11 @@ export default async function DashboardPage() {
       </div>
 
       {/* Super Admin Action Alerts (Certificate Requests & Employee Deletions) */}
-      <AdminActionAlerts userRole={user?.role || 'VIEWER'} />
+      <AdminActionAlerts
+        userRole={user?.role || 'VIEWER'}
+        initialCertRequests={user?.role === 'SUPER_ADMIN' ? pendingCertRequests : []}
+        initialPendingEmployees={user?.role === 'SUPER_ADMIN' ? pendingEmployees : []}
+      />
 
       {/* KPI Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

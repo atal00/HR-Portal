@@ -9,6 +9,7 @@ export interface SessionUser {
   department?: string;
   must_change_password?: boolean;
   session_version?: number;
+  mfa_enabled?: boolean;
 }
 
 export interface AuthResponse {
@@ -16,4 +17,7 @@ export interface AuthResponse {
   user?: SessionUser;
   token?: string;
   error?: string;
+  requiresMfa?: boolean;
+  challengeId?: string;
+  email?: string;
 }

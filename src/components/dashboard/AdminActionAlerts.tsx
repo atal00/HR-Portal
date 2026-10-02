@@ -7,12 +7,14 @@ import { formatDate } from '@/lib/utils';
 
 interface Props {
   userRole: string;
+  initialCertRequests?: CertificateAccessRequest[];
+  initialPendingEmployees?: Employee[];
 }
 
-export function AdminActionAlerts({ userRole }: Props) {
-  const [certRequests, setCertRequests] = useState<CertificateAccessRequest[]>([]);
-  const [pendingEmployees, setPendingEmployees] = useState<Employee[]>([]);
-  const [loading, setLoading] = useState(true);
+export function AdminActionAlerts({ userRole, initialCertRequests, initialPendingEmployees }: Props) {
+  const [certRequests, setCertRequests] = useState<CertificateAccessRequest[]>(initialCertRequests || []);
+  const [pendingEmployees, setPendingEmployees] = useState<Employee[]>(initialPendingEmployees || []);
+  const [loading, setLoading] = useState(initialCertRequests === undefined && initialPendingEmployees === undefined);
 
   // Modal states
   const [rejectCertModal, setRejectCertModal] = useState<CertificateAccessRequest | null>(null);
@@ -39,16 +41,18 @@ export function AdminActionAlerts({ userRole }: Props) {
     }
 
     try {
-      // 1. Certificate Requests
-      const certRes = await fetch('/api/certificate-requests');
+      // Parallelize both alert requests
+      const [certRes, empRes] = await Promise.all([
+        fetch('/api/certificate-requests'),
+        fetch('/api/employees'),
+      ]);
+
       if (certRes.ok) {
         const data = await certRes.json();
         const pending = (data.requests || []).filter((r: CertificateAccessRequest) => r.status === 'PENDING');
         setCertRequests(pending);
       }
 
-      // 2. Pending Employee Deletion Requests
-      const empRes = await fetch('/api/employees');
       if (empRes.ok) {
         const emps: Employee[] = await empRes.json();
         const pendingDel = emps.filter(e => e.deletion_status === 'DELETION_REQUESTED');
@@ -62,7 +66,9 @@ export function AdminActionAlerts({ userRole }: Props) {
   };
 
   useEffect(() => {
-    loadAlerts();
+    if (initialCertRequests === undefined && initialPendingEmployees === undefined) {
+      loadAlerts();
+    }
   }, [userRole]);
 
   // Certificate Request Actions

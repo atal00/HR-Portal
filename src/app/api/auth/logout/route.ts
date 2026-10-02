@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AUTH_COOKIE, getCurrentUser } from '@/lib/auth';
+import { MFA_CHALLENGE_COOKIE } from '@/lib/mfa';
 import { logAuditEvent } from '@/lib/audit';
 import { db } from '@/lib/db';
 
@@ -25,6 +26,12 @@ export async function POST(req: NextRequest) {
     name: AUTH_COOKIE.name,
     value: '',
     ...AUTH_COOKIE.options,
+    maxAge: 0,
+  });
+  res.cookies.set({
+    name: MFA_CHALLENGE_COOKIE.name,
+    value: '',
+    ...MFA_CHALLENGE_COOKIE.options,
     maxAge: 0,
   });
   return res;

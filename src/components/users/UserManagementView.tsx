@@ -165,6 +165,34 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
     }
   };
 
+  const handleResetMfa = async (targetUser: User) => {
+    if (!window.confirm(`Are you sure you want to reset Multi-Factor Authentication (TOTP MFA) for ${targetUser.full_name} (${targetUser.email})? This will invalidate their authenticator secret, delete existing recovery codes, and terminate any active sessions. They will be required to configure a new authenticator upon their next login.`)) {
+      return;
+    }
+
+    setLoading(true);
+    setMessage(null);
+    try {
+      const res = await fetch('/api/auth/mfa/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: targetUser.id,
+          reason: `Admin MFA reset requested by ${currentUserRole} via User Management console`,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to reset MFA for user.');
+
+      setMessage({ type: 'success', text: `MFA reset successfully for ${targetUser.email}. User must re-enroll on next login.` });
+      fetchUsers();
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleUpdateRole = async () => {
     if (!editRoleModalUser) return;
     setLoading(true);
@@ -594,6 +622,18 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
                               </button>
                             )}
 
+                            {isSuperAdmin && (
+                              <button
+                                type="button"
+                                onClick={() => handleResetMfa(u)}
+                                className="px-2.5 py-1 border border-amber-200 bg-amber-50/70 hover:bg-amber-100 text-amber-700 rounded text-[11px] font-bold transition flex items-center gap-1"
+                                title="Reset TOTP MFA and invalidate existing sessions"
+                              >
+                                <ShieldCheck className="h-3 w-3" />
+                                Reset MFA
+                              </button>
+                            )}
+
                             <button
                               type="button"
                               onClick={() => handleToggleActive(u, !u.is_active)}
@@ -978,9 +1018,9 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {allAvailablePermissions.map((code) => {
-                      const isBase = userPermissions?.basePermissions.includes(code) || false;
-                      const override = userPermissions?.overrides.find(o => o.permission_code === code);
-                      const isEffective = userPermissions?.effectivePermissions.includes(code) || false;
+                      const isBase = userPermissions?.basePermissions?.includes(code) || false;
+                      const override = userPermissions?.overrides?.find(o => o.permission_code === code);
+                      const isEffective = userPermissions?.effectivePermissions?.includes(code) || false;
 
                       let sourceLabel = 'Role-derived';
                       let sourceColor = 'bg-slate-100 text-slate-700';

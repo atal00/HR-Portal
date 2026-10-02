@@ -26,7 +26,8 @@ import {
   UserPermissionOverride,
   CorporateMetadata,
   CertificateAccessRequest,
-  UserCredential
+  UserCredential,
+  UserMfa
 } from '@/types/database';
 import { ROLE_PERMISSIONS } from './rbac';
 import { logAuditEvent, logSecurityEvent } from './audit';
@@ -470,8 +471,43 @@ export const db = {
         });
 
         const mappedList = validRows.map(mapSupabaseUser);
-        const enrichedUsers = await Promise.all(mappedList.map((u) => this.getById(u.id)));
-        return enrichedUsers.filter((u): u is User => u !== null && u.deletion_status !== 'DELETED');
+
+        // Batch load all user credentials and metadata in parallel (eliminating N+1 queries)
+        const [credsRes, metaRes] = await Promise.all([
+          supabase.from('user_credentials').select('user_id, must_change_password, temp_password_expires_at, session_version'),
+          supabase.from('system_settings').select('key, value').ilike('key', 'user_meta_%'),
+        ]);
+
+        const credMap = new Map<string, any>();
+        if (credsRes.data) {
+          for (const c of credsRes.data) {
+            credMap.set(c.user_id, c);
+          }
+        }
+
+        const metaMap = new Map<string, any>();
+        if (metaRes.data) {
+          for (const m of metaRes.data) {
+            metaMap.set(m.key, m.value);
+          }
+        }
+
+        for (const userRecord of mappedList) {
+          const meta = metaMap.get(`user_meta_${userRecord.id}`);
+          if (meta) {
+            if (meta.department && !userRecord.department) userRecord.department = meta.department;
+            if (meta.deletion_status && userRecord.deletion_status === 'NONE') userRecord.deletion_status = meta.deletion_status;
+            if (meta.deletion_reason) userRecord.deletion_reason = meta.deletion_reason;
+          }
+          const cred = credMap.get(userRecord.id);
+          if (cred) {
+            userRecord.must_change_password = cred.must_change_password;
+            userRecord.temp_password_expires_at = cred.temp_password_expires_at;
+            userRecord.session_version = cred.session_version;
+          }
+        }
+
+        return mappedList.filter((u) => u.deletion_status !== 'DELETED');
       }
 
       if (isProductionEnv()) {
@@ -528,13 +564,15 @@ export const db = {
 
         if (userRecord) {
           const metaKey = `user_meta_${userRecord.id}`;
-          const meta = await db.systemSettings.get<any>(metaKey);
+          const [meta, cred] = await Promise.all([
+            db.systemSettings.get<any>(metaKey),
+            db.userCredentials.getByUserId(userRecord.id),
+          ]);
           if (meta) {
             if (meta.department && !userRecord.department) userRecord.department = meta.department;
             if (meta.deletion_status && userRecord.deletion_status === 'NONE') userRecord.deletion_status = meta.deletion_status;
             if (meta.deletion_reason) userRecord.deletion_reason = meta.deletion_reason;
           }
-          const cred = await db.userCredentials.getByUserId(userRecord.id);
           if (cred) {
             userRecord.must_change_password = cred.must_change_password;
             userRecord.temp_password_expires_at = cred.temp_password_expires_at;
@@ -584,13 +622,15 @@ export const db = {
         if (!data) return null;
         const mapped = mapSupabaseUser(data);
         const metaKey = `user_meta_${mapped.id}`;
-        const meta = await db.systemSettings.get<any>(metaKey);
+        const [meta, cred] = await Promise.all([
+          db.systemSettings.get<any>(metaKey),
+          db.userCredentials.getByUserId(mapped.id),
+        ]);
         if (meta) {
           if (meta.department && !mapped.department) mapped.department = meta.department;
           if (meta.deletion_status && mapped.deletion_status === 'NONE') mapped.deletion_status = meta.deletion_status;
           if (meta.deletion_reason) mapped.deletion_reason = meta.deletion_reason;
         }
-        const cred = await db.userCredentials.getByUserId(mapped.id);
         if (cred) {
           mapped.must_change_password = cred.must_change_password;
           mapped.temp_password_expires_at = cred.temp_password_expires_at;
@@ -4111,7 +4151,414 @@ export const db = {
       const cred = (state.user_credentials || []).find((c) => c.user_id === userId);
       return cred?.session_version ?? null;
     },
-  }
+  },
+
+  userMfa: {
+    async getByUserId(userId: string): Promise<UserMfa | null> {
+      assertDatastoreMode();
+      if (isSupabaseMode()) {
+        const supabase = getSupabaseAdminClient();
+        const { data, error } = await supabase
+          .from('user_mfa')
+          .select('*')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (error) {
+          // Fail-closed: database query errors (e.g. missing table, schema error, connection drop)
+          // must NEVER be interpreted as MFA disabled.
+          throw new Error(`Database error (user_mfa.getByUserId): ${error.message}`);
+        }
+        return data as UserMfa | null;
+      }
+
+      if (isProductionEnv()) {
+        throw new Error('FATAL: Attempted to read local mock user_mfa in production environment.');
+      }
+
+      const state = localDb.getState();
+      return (state.user_mfa || []).find((m) => m.user_id === userId) || null;
+    },
+
+    async setChallengeNonce(userId: string, nonce: string | null): Promise<void> {
+      assertDatastoreMode();
+      const now = new Date().toISOString();
+      if (isSupabaseMode()) {
+        const supabase = getSupabaseAdminClient();
+        const { error } = await supabase
+          .from('user_mfa')
+          .update({
+            current_challenge_nonce: nonce,
+            updated_at: now,
+          })
+          .eq('user_id', userId);
+
+        if (error) {
+          console.warn('user_mfa.setChallengeNonce warning:', error.message);
+        }
+        return;
+      }
+
+      if (isProductionEnv()) {
+        throw new Error('FATAL: Attempted to write local mock user_mfa in production environment.');
+      }
+
+      const state = localDb.getState();
+      if (!state.user_mfa) return;
+      const mfa = state.user_mfa.find((m) => m.user_id === userId);
+      if (mfa) {
+        mfa.current_challenge_nonce = nonce;
+        mfa.updated_at = now;
+        localDb.save();
+      }
+    },
+
+    /**
+     * Atomically consumes an active MFA challenge nonce.
+     * Equivalent to:
+     * UPDATE public.user_mfa
+     * SET current_challenge_nonce = NULL, updated_at = NOW()
+     * WHERE user_id = $userId AND current_challenge_nonce = $nonce
+     * RETURNING user_id;
+     * Returns true if exactly 1 row was updated, false if 0 rows matched (already consumed or mismatched).
+     */
+    async consumeChallengeNonce(userId: string, nonce: string): Promise<boolean> {
+      assertDatastoreMode();
+      if (!userId || !nonce) return false;
+      const now = new Date().toISOString();
+
+      if (isSupabaseMode()) {
+        const supabase = getSupabaseAdminClient();
+        const { data, error } = await supabase
+          .from('user_mfa')
+          .update({
+            current_challenge_nonce: null,
+            updated_at: now,
+          })
+          .eq('user_id', userId)
+          .eq('current_challenge_nonce', nonce)
+          .select('user_id');
+
+        if (error) {
+          throw new Error(`Database error (user_mfa.consumeChallengeNonce): ${error.message}`);
+        }
+
+        return Array.isArray(data) && data.length > 0;
+      }
+
+      if (isProductionEnv()) {
+        throw new Error('FATAL: Attempted to write local mock user_mfa in production environment.');
+      }
+
+      const state = localDb.getState();
+      if (!state.user_mfa) return false;
+      const mfa = state.user_mfa.find((m) => m.user_id === userId && m.current_challenge_nonce === nonce);
+      if (!mfa) return false;
+      mfa.current_challenge_nonce = null;
+      mfa.updated_at = now;
+      localDb.save();
+      return true;
+    },
+
+    async createOrUpdatePending(params: {
+      userId: string;
+      encryptedSecret: string;
+      recoveryCodesHashes: string[];
+    }): Promise<UserMfa> {
+      assertDatastoreMode();
+      const now = new Date().toISOString();
+      const mfaRecord: UserMfa = {
+        id: crypto.randomUUID(),
+        user_id: params.userId,
+        method: 'totp',
+        secret_encrypted: params.encryptedSecret,
+        is_enabled: false,
+        is_verified: false,
+        recovery_codes_hashes: params.recoveryCodesHashes,
+        failed_attempts: 0,
+        locked_until: null,
+        last_used_at: null,
+        current_challenge_nonce: null,
+        created_at: now,
+        updated_at: now,
+      };
+
+      if (isSupabaseMode()) {
+        const supabase = getSupabaseAdminClient();
+        const { data, error } = await supabase
+          .from('user_mfa')
+          .upsert({
+            user_id: params.userId,
+            method: 'totp',
+            secret_encrypted: params.encryptedSecret,
+            is_enabled: false,
+            is_verified: false,
+            recovery_codes_hashes: params.recoveryCodesHashes,
+            failed_attempts: 0,
+            locked_until: null,
+            current_challenge_nonce: null,
+            updated_at: now,
+          }, { onConflict: 'user_id' })
+          .select('*')
+          .single();
+
+        if (error) throw new Error(`Supabase query error (user_mfa.createOrUpdatePending): ${error.message}`);
+        return data as UserMfa;
+      }
+
+      if (isProductionEnv()) {
+        throw new Error('FATAL: Attempted to write local mock user_mfa in production environment.');
+      }
+
+      const state = localDb.getState();
+      if (!state.user_mfa) state.user_mfa = [];
+      const idx = state.user_mfa.findIndex((m) => m.user_id === params.userId);
+      if (idx >= 0) {
+        state.user_mfa[idx] = {
+          ...state.user_mfa[idx],
+          ...mfaRecord,
+          id: state.user_mfa[idx].id,
+          created_at: state.user_mfa[idx].created_at,
+        };
+      } else {
+        state.user_mfa.push(mfaRecord);
+      }
+      localDb.save();
+      return mfaRecord;
+    },
+
+    async enableMfa(userId: string): Promise<void> {
+      assertDatastoreMode();
+      const now = new Date().toISOString();
+      if (isSupabaseMode()) {
+        const supabase = getSupabaseAdminClient();
+        const { error } = await supabase
+          .from('user_mfa')
+          .update({
+            is_enabled: true,
+            is_verified: true,
+            failed_attempts: 0,
+            locked_until: null,
+            last_used_at: now,
+            current_challenge_nonce: null,
+            updated_at: now,
+          })
+          .eq('user_id', userId);
+
+        if (error) throw new Error(`Failed to enable MFA: ${error.message}`);
+        return;
+      }
+
+      if (isProductionEnv()) {
+        throw new Error('FATAL: Attempted to write local mock user_mfa in production environment.');
+      }
+
+      const state = localDb.getState();
+      if (!state.user_mfa) return;
+      const mfa = state.user_mfa.find((m) => m.user_id === userId);
+      if (mfa) {
+        mfa.is_enabled = true;
+        mfa.is_verified = true;
+        mfa.failed_attempts = 0;
+        mfa.locked_until = null;
+        mfa.last_used_at = now;
+        mfa.current_challenge_nonce = null;
+        mfa.updated_at = now;
+        localDb.save();
+      }
+    },
+
+    async recordFailedAttempt(userId: string, maxAttempts: number = 5, lockoutMinutes: number = 15): Promise<{ isLocked: boolean; remainingAttempts: number; lockoutSeconds?: number }> {
+      assertDatastoreMode();
+      const now = new Date();
+      if (isSupabaseMode()) {
+        const supabase = getSupabaseAdminClient();
+        const { data: mfa, error: fetchErr } = await supabase
+          .from('user_mfa')
+          .select('failed_attempts, locked_until')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (fetchErr) throw new Error(`Database error (user_mfa.recordFailedAttempt): ${fetchErr.message}`);
+
+        const currentAttempts = (mfa?.failed_attempts || 0) + 1;
+        const isLocked = currentAttempts >= maxAttempts;
+        const lockedUntil = isLocked ? new Date(now.getTime() + lockoutMinutes * 60 * 1000).toISOString() : null;
+
+        const { error: updateErr } = await supabase
+          .from('user_mfa')
+          .update({
+            failed_attempts: currentAttempts,
+            locked_until: lockedUntil,
+            updated_at: now.toISOString(),
+          })
+          .eq('user_id', userId);
+
+        if (updateErr) throw new Error(`Database error (user_mfa.recordFailedAttempt update): ${updateErr.message}`);
+
+        return {
+          isLocked,
+          remainingAttempts: Math.max(0, maxAttempts - currentAttempts),
+          lockoutSeconds: isLocked ? lockoutMinutes * 60 : undefined,
+        };
+      }
+
+      if (isProductionEnv()) {
+        throw new Error('FATAL: Attempted to write local mock user_mfa in production environment.');
+      }
+
+      const state = localDb.getState();
+      if (!state.user_mfa) state.user_mfa = [];
+      const mfa = state.user_mfa.find((m) => m.user_id === userId);
+      if (mfa) {
+        mfa.failed_attempts = (mfa.failed_attempts || 0) + 1;
+        const isLocked = mfa.failed_attempts >= maxAttempts;
+        if (isLocked) {
+          mfa.locked_until = new Date(now.getTime() + lockoutMinutes * 60 * 1000).toISOString();
+        }
+        mfa.updated_at = now.toISOString();
+        localDb.save();
+        return {
+          isLocked,
+          remainingAttempts: Math.max(0, maxAttempts - mfa.failed_attempts),
+          lockoutSeconds: isLocked ? lockoutMinutes * 60 : undefined,
+        };
+      }
+      return { isLocked: false, remainingAttempts: maxAttempts - 1 };
+    },
+
+    async resetFailedAttempts(userId: string): Promise<void> {
+      assertDatastoreMode();
+      const now = new Date().toISOString();
+      if (isSupabaseMode()) {
+        const supabase = getSupabaseAdminClient();
+        const { error } = await supabase
+          .from('user_mfa')
+          .update({
+            failed_attempts: 0,
+            locked_until: null,
+            last_used_at: now,
+            updated_at: now,
+          })
+          .eq('user_id', userId);
+        if (error) throw new Error(`Database error (user_mfa.resetFailedAttempts): ${error.message}`);
+        return;
+      }
+
+      if (isProductionEnv()) {
+        throw new Error('FATAL: Attempted to write local mock user_mfa in production environment.');
+      }
+
+      const state = localDb.getState();
+      if (!state.user_mfa) return;
+      const mfa = state.user_mfa.find((m) => m.user_id === userId);
+      if (mfa) {
+        mfa.failed_attempts = 0;
+        mfa.locked_until = null;
+        mfa.last_used_at = now;
+        mfa.updated_at = now;
+        localDb.save();
+      }
+    },
+
+    async consumeRecoveryCode(userId: string, codeHash: string): Promise<boolean> {
+      assertDatastoreMode();
+      const now = new Date().toISOString();
+      if (isSupabaseMode()) {
+        const supabase = getSupabaseAdminClient();
+        const { data: mfa, error: fetchErr } = await supabase
+          .from('user_mfa')
+          .select('recovery_codes_hashes')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (fetchErr) throw new Error(`Database error (user_mfa.consumeRecoveryCode): ${fetchErr.message}`);
+
+        const hashes: string[] = mfa?.recovery_codes_hashes || [];
+        const index = hashes.indexOf(codeHash);
+        if (index === -1) return false;
+
+        const updatedHashes = hashes.filter((_, idx) => idx !== index);
+        const { error: updateErr } = await supabase
+          .from('user_mfa')
+          .update({
+            recovery_codes_hashes: updatedHashes,
+            failed_attempts: 0,
+            locked_until: null,
+            last_used_at: now,
+            updated_at: now,
+          })
+          .eq('user_id', userId);
+
+        if (updateErr) throw new Error(`Database error (user_mfa.consumeRecoveryCode update): ${updateErr.message}`);
+
+        return true;
+      }
+
+      if (isProductionEnv()) {
+        throw new Error('FATAL: Attempted to write local mock user_mfa in production environment.');
+      }
+
+      const state = localDb.getState();
+      if (!state.user_mfa) return false;
+      const mfa = state.user_mfa.find((m) => m.user_id === userId);
+      if (!mfa || !mfa.recovery_codes_hashes) return false;
+      const index = mfa.recovery_codes_hashes.indexOf(codeHash);
+      if (index === -1) return false;
+
+      mfa.recovery_codes_hashes = mfa.recovery_codes_hashes.filter((_, idx) => idx !== index);
+      mfa.failed_attempts = 0;
+      mfa.locked_until = null;
+      mfa.last_used_at = now;
+      mfa.updated_at = now;
+      localDb.save();
+      return true;
+    },
+
+    async resetMfa(userId: string): Promise<void> {
+      assertDatastoreMode();
+      const now = new Date().toISOString();
+      if (isSupabaseMode()) {
+        const supabase = getSupabaseAdminClient();
+        const { error } = await supabase
+          .from('user_mfa')
+          .update({
+            is_enabled: false,
+            is_verified: false,
+            secret_encrypted: null,
+            recovery_codes_hashes: [],
+            failed_attempts: 0,
+            locked_until: null,
+            last_used_at: null,
+            current_challenge_nonce: null,
+            updated_at: now,
+          })
+          .eq('user_id', userId);
+        if (error) throw new Error(`Database error (user_mfa.resetMfa): ${error.message}`);
+        return;
+      }
+
+      if (isProductionEnv()) {
+        throw new Error('FATAL: Attempted to write local mock user_mfa in production environment.');
+      }
+
+      const state = localDb.getState();
+      if (!state.user_mfa) return;
+      const mfa = state.user_mfa.find((m) => m.user_id === userId);
+      if (mfa) {
+        mfa.is_enabled = false;
+        mfa.is_verified = false;
+        mfa.secret_encrypted = null;
+        mfa.recovery_codes_hashes = [];
+        mfa.failed_attempts = 0;
+        mfa.locked_until = null;
+        mfa.last_used_at = null;
+        mfa.current_challenge_nonce = null;
+        mfa.updated_at = now;
+        localDb.save();
+      }
+    },
+  },
 };
 
 

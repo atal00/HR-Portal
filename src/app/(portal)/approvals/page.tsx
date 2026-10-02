@@ -59,12 +59,13 @@ export default function ApprovalsPage() {
 
       if (userRes.ok) {
         const u = await userRes.json();
-        setCurrentUser(u);
+        const sessionUser: SessionUser | null = u?.user || (u?.id ? u : null);
+        setCurrentUser(sessionUser);
       }
 
       if (docsRes.ok) {
         const d = await docsRes.json();
-        setPendingDocs(d);
+        setPendingDocs(Array.isArray(d) ? d : []);
       }
     } catch (e) {
       console.error(e);

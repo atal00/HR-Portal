@@ -13,7 +13,8 @@ import {
   DocumentType,
   DocumentWorkflowStatus,
   TaskRecord,
-  UserCredential
+  UserCredential,
+  UserMfa
 } from '@/types/database';
 import { ROLE_PERMISSIONS } from '@/lib/rbac';
 import { formatDocumentNumber, generateVerificationId } from '@/lib/id-generator';
@@ -34,6 +35,7 @@ export interface DatabaseState {
   sequences: Record<DocumentType, number>;
   tasks?: TaskRecord[];
   user_credentials?: UserCredential[];
+  user_mfa?: UserMfa[];
 }
 
 // Initial Seed Data with approved Varsaka Labs records
@@ -492,6 +494,7 @@ const INITIAL_STATE: DatabaseState = {
     CERTIFICATE: 1002,
   },
   tasks: [],
+  user_mfa: [],
 };
 
 class LocalDatabase {

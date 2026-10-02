@@ -218,20 +218,26 @@ export const PERMISSION_DESCRIPTIONS: Record<PermissionCode, string> = {
  */
 export function hasPermission(user: SessionUser | null | undefined, permission: PermissionCode): boolean {
   if (!user) return false;
-  if (user.role === 'SUPER_ADMIN') return true;
-  return user.permissions.includes(permission);
+  const effectiveUser: SessionUser = (user as any)?.user || user;
+  if (effectiveUser.role === 'SUPER_ADMIN') return true;
+  if (!Array.isArray(effectiveUser.permissions)) return false;
+  return effectiveUser.permissions.includes(permission);
 }
 
 export function hasAnyPermission(user: SessionUser | null | undefined, permissions: PermissionCode[]): boolean {
   if (!user) return false;
-  if (user.role === 'SUPER_ADMIN') return true;
-  return permissions.some((p) => user.permissions.includes(p));
+  const effectiveUser: SessionUser = (user as any)?.user || user;
+  if (effectiveUser.role === 'SUPER_ADMIN') return true;
+  if (!Array.isArray(effectiveUser.permissions)) return false;
+  return permissions.some((p) => effectiveUser.permissions.includes(p));
 }
 
 export function hasAllPermissions(user: SessionUser | null | undefined, permissions: PermissionCode[]): boolean {
   if (!user) return false;
-  if (user.role === 'SUPER_ADMIN') return true;
-  return permissions.every((p) => user.permissions.includes(p));
+  const effectiveUser: SessionUser = (user as any)?.user || user;
+  if (effectiveUser.role === 'SUPER_ADMIN') return true;
+  if (!Array.isArray(effectiveUser.permissions)) return false;
+  return permissions.every((p) => effectiveUser.permissions.includes(p));
 }
 
 export function canAccessSalary(user: SessionUser | null | undefined): boolean {

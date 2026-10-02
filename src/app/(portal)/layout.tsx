@@ -20,6 +20,10 @@ export default async function PortalLayout({
     redirect('/change-password');
   }
 
+  if (!user.mfa_enabled) {
+    redirect('/mfa-setup');
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans antialiased">
       <Toaster position="top-right" toastOptions={{ duration: 4000 }} />

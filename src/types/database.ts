@@ -129,6 +129,22 @@ export interface UserCredential {
   updated_at: string;
 }
 
+export interface UserMfa {
+  id: string;
+  user_id: string;
+  method: 'totp';
+  secret_encrypted?: string | null;
+  is_enabled: boolean;
+  is_verified: boolean;
+  recovery_codes_hashes: string[];
+  failed_attempts: number;
+  locked_until?: string | null;
+  last_used_at?: string | null;
+  current_challenge_nonce?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Department {
   id: string;
   name: string;

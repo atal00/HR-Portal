@@ -73,7 +73,8 @@ export default function DocumentDetailsPage() {
       }
       if (userRes.ok) {
         const u = await userRes.json();
-        setCurrentUser(u);
+        const sessionUser: SessionUser | null = u?.user || (u?.id ? u : null);
+        setCurrentUser(sessionUser);
       }
     } catch (e: any) {
       setError(e.message);
