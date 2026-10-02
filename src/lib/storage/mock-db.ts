@@ -552,4 +552,27 @@ class LocalDatabase {
   }
 }
 
-export const localDb = new LocalDatabase();
+let _localDbInstance: LocalDatabase | null = null;
+
+export function getLocalDb(): LocalDatabase {
+  if (process.env.NODE_ENV === 'production' || process.env.STORAGE_MODE === 'supabase') {
+    throw new Error(
+      'FATAL DATA INTEGRITY VIOLATION: Accessing local JSON mock datastore is strictly prohibited when STORAGE_MODE=supabase or NODE_ENV=production.'
+    );
+  }
+  if (!_localDbInstance) {
+    _localDbInstance = new LocalDatabase();
+  }
+  return _localDbInstance;
+}
+
+export const localDb: LocalDatabase = new Proxy({} as LocalDatabase, {
+  get(_target, prop) {
+    const instance = getLocalDb();
+    const value = (instance as any)[prop];
+    if (typeof value === 'function') {
+      return value.bind(instance);
+    }
+    return value;
+  },
+});
