@@ -47,7 +47,7 @@ const DEFAULT_BRANDING: DocumentBrandingSettings = {
     name: 'Authorized Signatory',
     title: 'Authorized Signatory',
     department: 'HR Department',
-    company: 'Varsaka Labs Pvt. Ltd.',
+    company: 'Varsaka Labs',
     signature_url: '/brand/sign.jpeg',
     version: 1,
     is_active: true,

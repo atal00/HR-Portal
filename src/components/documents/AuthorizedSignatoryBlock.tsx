@@ -23,7 +23,7 @@ export interface AuthorizedSignatoryBlockProps {
 export const AuthorizedSignatoryBlock: React.FC<AuthorizedSignatoryBlockProps> = ({
   signatoryName = 'Authorized Signatory',
   signatoryTitle = 'HR Operations / Talent Acquisition',
-  companyName = 'Varsaka Labs Pvt. Ltd.',
+  companyName = 'Varsaka Labs',
   signatureUrl = '/brand/sign.jpeg',
   stampUrl = '/brand/varsaka-seal.png',
   showSeal = true,
@@ -163,7 +163,7 @@ export interface DualSignatureGridProps {
  * Complies with strict reference visual specifications:
  * - LEFT SIDE:
  *   Thank you,
- *   For Varsaka Labs Pvt. Ltd.
+ *   For Varsaka Labs
  *   [signature]  [official stamp] (sitting close together, natural aspect ratio)
  *   ________________________________ (divider line)
  *   AUTHORIZED SIGNATORY
@@ -191,7 +191,7 @@ export const DualSignatureGrid: React.FC<DualSignatureGridProps> = ({
   candidateName,
   signatoryName = 'Alisha Kapoor',
   signatoryTitle = 'HR Director',
-  companyName = 'Varsaka Labs Pvt. Ltd.',
+  companyName = 'Varsaka Labs',
   signatureUrl = '/brand/sign.jpeg',
   stampUrl = '/brand/varsaka-seal.png',
   showSeal = true,
@@ -208,7 +208,7 @@ export const DualSignatureGrid: React.FC<DualSignatureGridProps> = ({
           <div className="text-xs text-slate-800 leading-tight mb-2">
             <div>Thank you,</div>
             <div className="font-bold text-blue-950 mt-0.5">
-              For {companyName.includes('Pvt') ? companyName : `${companyName} Pvt. Ltd.`}
+              For {companyName}
             </div>
           </div>
         )}

@@ -24,7 +24,7 @@ export const CertificateTemplate: React.FC<Props> = ({
     : '/brand/varsaka-seal.png';
   const signatoryName = data.signatory?.name || data.authorizedSignatory || 'Authorized Signatory';
   const signatoryTitle = data.signatory?.title || 'HR Department';
-  const companyName = data.signatory?.company || data.companyName || 'Varsaka Labs Pvt. Ltd.';
+  const companyName = data.signatory?.company || data.companyName || 'Varsaka Labs';
 
   return (
     <div className="a4-certificate-page text-slate-900">
@@ -161,7 +161,7 @@ export const CertificateTemplate: React.FC<Props> = ({
 
           {/* Bottom Micro Footer */}
           <div className="text-center text-[7.5pt] text-slate-400 mt-2 border-t border-slate-100 pt-1">
-            Varsaka Labs Pvt. Ltd. • APHB Colony, JV Colony, Indira Nagar, Gachibowli, Hyderabad, Telangana 500032 • {verificationUrl}
+            Varsaka Labs • APHB Colony, JV Colony, Indira Nagar, Gachibowli, Hyderabad, Telangana 500032 • {verificationUrl}
           </div>
 
         </div>

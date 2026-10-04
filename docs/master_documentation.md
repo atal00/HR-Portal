@@ -1,6 +1,6 @@
 # VARSAKA HR DOCUMENT MANAGEMENT & VERIFICATION PORTAL
 ## Production-Grade Enterprise System Master Documentation
-**Organization**: Varsaka Labs Private Limited  
+**Organization**: Varsaka Labs  
 **System**: Varsaka HR Document Management & Verification Portal  
 **Document Version**: 1.0.0 (Production Release)  
 **Date**: September 30, 2026  

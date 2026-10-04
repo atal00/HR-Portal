@@ -4342,7 +4342,7 @@ export const db = {
       assertDatastoreMode();
       const defaultMetadata: CorporateMetadata = {
         brand_name: 'Varsaka Labs',
-        legal_entity: 'Varsaka Labs Pvt. Ltd.',
+        legal_entity: 'Varsaka Labs',
         corporate_website: 'https://varsaka.com',
         corporate_email: 'info@varsakalabs.com',
         registered_office_address: 'APHB Colony, JV Colony, Indira Nagar, Gachibowli, Hyderabad, Telangana 500032',

@@ -276,7 +276,7 @@ async function runPhase6Tests() {
       ...initialBranding.signatory,
       name: 'Dr. Vikram Chandra',
       title: 'Head of Human Resources & People Operations',
-      company: 'Varsaka Labs Pvt. Ltd.',
+      company: 'Varsaka Labs',
       department: 'Human Resources',
     },
   }, 'USR-SUPERADMIN-001');

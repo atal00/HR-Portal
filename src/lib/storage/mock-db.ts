@@ -342,7 +342,7 @@ const INITIAL_STATE: DatabaseState = {
         workLocation: 'New Delhi / Work from Home',
         issueDate: '06 Sep, 2026',
         authorizedSignatory: 'Authorized Signatory, HR Department',
-        companyName: 'Varsaka Labs Pvt. Ltd.',
+        companyName: 'Varsaka Labs',
         verificationUrl: 'http://localhost:3000/verify/VVR-CERT-7B9A2F',
       },
       created_by: 'usr-doc-admin-01',

@@ -26,7 +26,7 @@ export const ExperienceLetterTemplate: React.FC<Props> = ({
     : '/brand/varsaka-seal.png';
   const signatoryName = data.signatory?.name || data.authorizedSignatoryName || 'Authorized Signatory';
   const signatoryTitle = data.signatory?.title || data.authorizedSignatoryTitle || 'Head of Human Resources';
-  const companyName = data.signatory?.company || 'Varsaka Labs Pvt. Ltd.';
+  const companyName = data.signatory?.company || 'Varsaka Labs';
 
   const tenureDuration = data.tenureText || (data.joiningDate && data.lastWorkingDate ? calculateTenure(data.joiningDate, data.lastWorkingDate) : '');
 
@@ -71,7 +71,7 @@ export const ExperienceLetterTemplate: React.FC<Props> = ({
         {/* Certificate Text */}
         <div className="space-y-4 text-justify text-xs sm:text-sm leading-relaxed text-slate-800">
           <p>
-            This is to formally certify that <strong>Mr./Ms. {data.employeeName}</strong> (Employee ID: <strong>{data.employeeId}</strong>) was employed with <strong>Varsaka Labs Pvt. Ltd.</strong> from <strong>{formatDate(data.joiningDate)}</strong> to <strong>{formatDate(data.lastWorkingDate)}</strong>{tenureDuration ? ` (Tenure: ${tenureDuration})` : ''}.
+            This is to formally certify that <strong>Mr./Ms. {data.employeeName}</strong> (Employee ID: <strong>{data.employeeId}</strong>) was employed with <strong>Varsaka Labs</strong> from <strong>{formatDate(data.joiningDate)}</strong> to <strong>{formatDate(data.lastWorkingDate)}</strong>{tenureDuration ? ` (Tenure: ${tenureDuration})` : ''}.
           </p>
 
           <p>
@@ -124,7 +124,7 @@ export const ExperienceLetterTemplate: React.FC<Props> = ({
 
       {/* Footer Bar */}
       <div className="pt-3 border-t border-slate-300 text-[8.5pt] text-slate-500 text-center">
-        <div>Varsaka Labs Pvt. Ltd. • APHB Colony, JV Colony, Indira Nagar, Gachibowli, Hyderabad, Telangana 500032.</div>
+        <div>Varsaka Labs • APHB Colony, JV Colony, Indira Nagar, Gachibowli, Hyderabad, Telangana 500032.</div>
         <div className="text-[7.5pt] text-slate-400 mt-0.5">
           Email: info@varsakalabs.com • Web: https://varsaka.com/ • Verification: {verificationUrl}
         </div>

@@ -163,7 +163,7 @@ export default function VerificationLandingPage() {
 
       {/* Footer */}
       <footer className="text-center text-[11px] text-slate-400 mt-8">
-        © {new Date().getFullYear()} Varsaka Labs Pvt. Ltd. • All rights reserved.
+        © {new Date().getFullYear()} Varsaka Labs • All rights reserved.
       </footer>
     </div>
   );

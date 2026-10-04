@@ -172,7 +172,7 @@ export interface CertificateData {
   workLocation: string;     // e.g. "New Delhi / Work from Home"
   issueDate: string;        // e.g. "06 Sep, 2024"
   authorizedSignatory: string; // "Authorized Signatory, HR Department"
-  companyName: string;      // "Varsaka Labs Pvt. Ltd."
+  companyName: string;      // "Varsaka Labs"
   verificationUrl: string;  // canonical URL with verification ID
   signatory?: DocumentSignatorySnapshot;
   stamp?: DocumentStampSnapshot;

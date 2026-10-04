@@ -543,7 +543,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
           </h2>
           <div className="space-y-4 text-xs leading-relaxed text-justify text-slate-800">
             <p>
-              All employees of Varsaka Labs are required to undertake the following Confidentiality and Non-Disclosure Agreement. This agreement is intended to ensure all confidential information is not used either intentionally or unintentionally to undermine the interest of Varsaka Labs. During the course of employment at Varsaka Labs Pvt. Ltd., you will have access to information relating to the company (and its business and products), which has commercial and strategic value to Varsaka Labs and which Varsaka Labs desires to keep confidential.
+              All employees of Varsaka Labs are required to undertake the following Confidentiality and Non-Disclosure Agreement. This agreement is intended to ensure all confidential information is not used either intentionally or unintentionally to undermine the interest of Varsaka Labs. During the course of employment at Varsaka Labs, you will have access to information relating to the company (and its business and products), which has commercial and strategic value to Varsaka Labs and which Varsaka Labs desires to keep confidential.
             </p>
             <p>
               The term “Confidential Information” includes trade secrets, proprietary techniques, know-how, discoveries, inventions, marketing information, business strategies, client databases, and any other non-public company material.

@@ -172,7 +172,7 @@ export default async function PublicVerificationPage({ params }: Props) {
                   <ShieldCheck className="h-5 w-5 text-blue-600 shrink-0" />
                   <div>
                     <span className="font-bold text-slate-800">Authorized Signatory:</span> {result.authorized_signatory}
-                    <div className="text-[10px] text-slate-400">Varsaka Labs Pvt. Ltd. Central Document Repository</div>
+                    <div className="text-[10px] text-slate-400">Varsaka Labs Central Document Repository</div>
                   </div>
                 </div>
               </>
@@ -300,7 +300,7 @@ export default async function PublicVerificationPage({ params }: Props) {
 
       {/* Footer */}
       <footer className="text-center text-[11px] text-slate-400 mt-8">
-        © {new Date().getFullYear()} Varsaka Labs Pvt. Ltd. • All rights reserved.
+        © {new Date().getFullYear()} Varsaka Labs • All rights reserved.
       </footer>
     </div>
   );

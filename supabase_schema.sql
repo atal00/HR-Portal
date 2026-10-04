@@ -618,7 +618,7 @@ ON CONFLICT (name) DO NOTHING;
 INSERT INTO system_settings (key, value, description) VALUES
 ('company_info', '{
     "company_name": "Varsaka Labs",
-    "legal_entity": "Varsaka Labs Pvt. Ltd.",
+    "legal_entity": "Varsaka Labs",
     "website": "https://varsaka.com",
     "email": "info@varsakalabs.com",
     "phone": "+91 40 6000 0000",

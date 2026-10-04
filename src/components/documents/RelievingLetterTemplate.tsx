@@ -25,7 +25,7 @@ export const RelievingLetterTemplate: React.FC<Props> = ({
     : '/brand/varsaka-seal.png';
   const signatoryName = data.signatory?.name || data.authorizedSignatoryName || 'Authorized Signatory';
   const signatoryTitle = data.signatory?.title || data.authorizedSignatoryTitle || 'Head of Human Resources';
-  const companyName = data.signatory?.company || 'Varsaka Labs Pvt. Ltd.';
+  const companyName = data.signatory?.company || 'Varsaka Labs';
 
   return (
     <div className="a4-single-page text-slate-900 font-sans text-[10pt] leading-relaxed">
@@ -80,7 +80,7 @@ export const RelievingLetterTemplate: React.FC<Props> = ({
           </p>
 
           <p>
-            With reference to your formal resignation letter{data.resignationDate ? ` submitted on ${formatDate(data.resignationDate)}` : ''}, this is to confirm that your resignation has been accepted by the management of <strong>Varsaka Labs Pvt. Ltd.</strong>
+            With reference to your formal resignation letter{data.resignationDate ? ` submitted on ${formatDate(data.resignationDate)}` : ''}, this is to confirm that your resignation has been accepted by the management of <strong>Varsaka Labs</strong>
           </p>
 
           <p>
@@ -133,7 +133,7 @@ export const RelievingLetterTemplate: React.FC<Props> = ({
 
       {/* Footer Bar */}
       <div className="pt-2 border-t border-slate-300 text-[8pt] text-slate-500 text-center">
-        <div>Varsaka Labs Pvt. Ltd. • APHB Colony, JV Colony, Indira Nagar, Gachibowli, Hyderabad, Telangana 500032.</div>
+        <div>Varsaka Labs • APHB Colony, JV Colony, Indira Nagar, Gachibowli, Hyderabad, Telangana 500032.</div>
         <div className="text-[7.5pt] text-slate-400 mt-0.5">
           Email: info@varsakalabs.com • Web: https://varsaka.com/ • Verification: {verificationUrl}
         </div>

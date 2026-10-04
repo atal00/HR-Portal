@@ -33,7 +33,7 @@ export const SalarySlipTemplate: React.FC<Props> = ({
                 className="h-13 w-auto object-contain shrink-0" 
               />
               <div>
-                <h1 className="text-lg font-black text-blue-950 tracking-wider">VARSAKA LABS PVT. LTD.</h1>
+                <h1 className="text-lg font-black text-blue-950 tracking-wider">VARSAKA LABS</h1>
                 <p className="text-[10px] text-slate-600">APHB Colony, JV Colony, Indira Nagar, Gachibowli, Hyderabad, Telangana 500032</p>
                 <p className="text-[8.5pt] text-slate-500">Corporate Identity No: U72900TG2023PTC178920 • Web: https://varsaka.com</p>
               </div>
@@ -201,7 +201,7 @@ export const SalarySlipTemplate: React.FC<Props> = ({
       {/* Footer Notes */}
       <div className="pt-4 border-t border-slate-300 text-[8pt] text-slate-500 text-center space-y-0.5">
         <div>Note: This is a system-generated electronic payroll document and requires no physical ink signature.</div>
-        <div>Varsaka Labs Pvt. Ltd. • Registered Office: Hyderabad, Telangana, India • info@varsakalabs.com</div>
+        <div>Varsaka Labs • Registered Office: Hyderabad, Telangana, India • info@varsakalabs.com</div>
       </div>
 
     </div>

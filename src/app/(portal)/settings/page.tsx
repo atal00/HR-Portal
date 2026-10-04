@@ -51,7 +51,7 @@ export default function SettingsPage() {
   const [editMetaModalOpen, setEditMetaModalOpen] = useState(false);
   const [metaForm, setMetaForm] = useState({
     brand_name: 'Varsaka Labs',
-    legal_entity: 'Varsaka Labs Pvt. Ltd.',
+    legal_entity: 'Varsaka Labs',
     corporate_website: 'https://varsaka.com',
     corporate_email: 'info@varsakalabs.com',
     registered_office_address: 'APHB Colony, JV Colony, Indira Nagar, Gachibowli, Hyderabad, Telangana 500032',
@@ -377,7 +377,7 @@ export default function SettingsPage() {
                         type="text"
                         value={sigCompany}
                         onChange={(e) => setSigCompany(e.target.value)}
-                        placeholder="e.g. Varsaka Labs Pvt. Ltd."
+                        placeholder="e.g. Varsaka Labs"
                         className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 bg-white"
                       />
                     </div>
@@ -552,7 +552,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <span className="text-slate-400 block mb-0.5">Legal Entity</span>
-              <span className="font-bold text-slate-900">{corporateMetadata?.legal_entity || 'Varsaka Labs Pvt. Ltd.'}</span>
+              <span className="font-bold text-slate-900">{corporateMetadata?.legal_entity || 'Varsaka Labs'}</span>
             </div>
             <div>
               <span className="text-slate-400 block mb-0.5">Corporate Website</span>
