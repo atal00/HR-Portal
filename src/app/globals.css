@@ -17,11 +17,12 @@
   --color-varsaka-gold-600: #a17c24;
   --color-varsaka-gold-100: #fef7e0;
 }
-
 :root {
   --font-inter: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-serif: 'Playfair Display', Georgia, serif;
   --font-cinzel: 'Cinzel', serif;
+  --font-old-standard: 'Old Standard TT', Georgia, 'Times New Roman', serif;
+  --font-typewriter: 'Courier Prime', 'Courier New', Courier, monospace;
 
   /* Varsaka Enterprise Color System */
   --varsaka-navy-950: #0a0f1d;
@@ -36,6 +37,29 @@
   --varsaka-gold-600: #a17c24;
   --varsaka-gold-100: #fef7e0;
 }
+
+.font-offer-default {
+  font-family: var(--font-inter);
+}
+
+.font-offer-old-style {
+  font-family: var(--font-old-standard);
+}
+
+.font-offer-typewriter {
+  font-family: var(--font-typewriter);
+}
+
+/* Document Typography & Quality Guarantees: prevents unintended lines, underlines, and spellcheck marks */
+.document-clean-body {
+  text-decoration: none;
+}
+.document-clean-body p,
+.document-clean-body span,
+.document-clean-body div:not([class*="border"]):not([class*="underline"]) {
+  text-decoration-line: none;
+}
+
 
 *, *::before, *::after {
   box-sizing: border-box;
@@ -251,3 +275,44 @@ img, svg, video, canvas {
 ::-webkit-scrollbar-thumb:hover {
   background-color: #94a3b8;
 }
+
+/* ==============================================================================
+   Varsaka HR Portal — Interactive Elements Pointer Cursor Standards
+   ============================================================================== */
+
+/* 1. All enabled clickable interactive controls receive pointer cursor */
+button:not(:disabled):not([aria-disabled="true"]),
+[role="button"]:not([aria-disabled="true"]):not(:disabled),
+input[type="button"]:not(:disabled),
+input[type="submit"]:not(:disabled),
+input[type="reset"]:not(:disabled),
+input[type="checkbox"]:not(:disabled),
+input[type="radio"]:not(:disabled),
+select:not(:disabled),
+summary,
+a[href] {
+  cursor: pointer;
+}
+
+/* 2. Disabled controls: strictly not-allowed cursor */
+button:disabled,
+button[disabled],
+button.disabled,
+[role="button"][aria-disabled="true"],
+[role="button"]:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed !important;
+}
+
+/* 3. Utility classes for explicit control & overriding */
+.cursor-pointer {
+  cursor: pointer !important;
+}
+
+.cursor-not-allowed {
+  cursor: not-allowed !important;
+}
+

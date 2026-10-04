@@ -2,15 +2,37 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Lock, Mail, ShieldCheck, AlertCircle, Eye, EyeOff, Smartphone, Key, ArrowLeft } from 'lucide-react';
+import { Lock, Mail, ShieldCheck, AlertCircle, Eye, EyeOff, Smartphone, Key, ArrowLeft, Clock } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/Loading';
 
-export default function LoginClient() {
+interface LoginClientProps {
+  initialReason?: string;
+}
+
+export default function LoginClient({ initialReason }: LoginClientProps = {}) {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionExpiredNotice, setSessionExpiredNotice] = useState<string | null>(() => {
+    if (initialReason === 'inactivity' || initialReason === 'session_expired') {
+      return 'Your session has expired due to 20 minutes of inactivity. Please sign in again to continue.';
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const reason = params.get('reason');
+      const expired = params.get('expired');
+      if (reason === 'inactivity' || reason === 'session_expired' || expired === 'true') {
+        setSessionExpiredNotice('Your session has expired due to 20 minutes of inactivity. Please sign in again to continue.');
+      }
+    }
+  }, []);
 
   // MFA Challenge State
   const [requiresMfa, setRequiresMfa] = useState(false);
@@ -222,6 +244,16 @@ export default function LoginClient() {
 
         {/* Card */}
         <div className="bg-white py-8 px-6 sm:px-8 shadow-xl shadow-slate-200/50 rounded-2xl border border-slate-200">
+          {sessionExpiredNotice && (
+            <div className="mb-6 p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2.5 shadow-2xs">
+              <Clock className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+              <div>
+                <span className="font-bold block">Session Expired</span>
+                <span className="text-amber-800">{sessionExpiredNotice}</span>
+              </div>
+            </div>
+          )}
+
           {error && (
             <div className="mb-6 p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-800 flex items-center gap-2.5">
               <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
@@ -295,9 +327,12 @@ export default function LoginClient() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full mt-2 flex justify-center items-center py-2.5 px-4 border border-transparent rounded-lg text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm transition disabled:opacity-50 cursor-pointer"
+                aria-busy={loading}
+                aria-disabled={loading}
+                className="w-full mt-2 flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-lg text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm transition disabled:opacity-50 cursor-pointer"
               >
-                {loading ? 'Authenticating...' : 'Sign In to Portal'}
+                {loading && <LoadingSpinner size="xs" variant="white" />}
+                <span>{loading ? 'Authenticating...' : 'Sign In to Portal'}</span>
               </button>
             </form>
           ) : mfaMode === 'totp' ? (
@@ -343,9 +378,12 @@ export default function LoginClient() {
                 <button
                   type="submit"
                   disabled={loading || totpCode.length !== 6}
-                  className="w-full flex justify-center items-center py-2.5 px-4 border border-transparent rounded-lg text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm transition disabled:opacity-50 cursor-pointer"
+                  aria-busy={loading}
+                  aria-disabled={loading || totpCode.length !== 6}
+                  className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-lg text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm transition disabled:opacity-50 cursor-pointer"
                 >
-                  {loading ? 'Verifying...' : 'Verify & Sign In'}
+                  {loading && <LoadingSpinner size="xs" variant="white" />}
+                  <span>{loading ? 'Verifying...' : 'Verify & Sign In'}</span>
                 </button>
 
                 <div className="flex items-center justify-between text-xs pt-1">
@@ -407,9 +445,12 @@ export default function LoginClient() {
                 <button
                   type="submit"
                   disabled={loading || !recoveryCode.trim()}
-                  className="w-full flex justify-center items-center py-2.5 px-4 border border-transparent rounded-lg text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm transition disabled:opacity-50 cursor-pointer"
+                  aria-busy={loading}
+                  aria-disabled={loading || !recoveryCode.trim()}
+                  className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-lg text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm transition disabled:opacity-50 cursor-pointer"
                 >
-                  {loading ? 'Verifying...' : 'Verify with Recovery Code'}
+                  {loading && <LoadingSpinner size="xs" variant="white" />}
+                  <span>{loading ? 'Verifying...' : 'Verify with Recovery Code'}</span>
                 </button>
 
                 <div className="flex items-center justify-between text-xs pt-1">

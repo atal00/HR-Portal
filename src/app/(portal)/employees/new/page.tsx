@@ -5,26 +5,24 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { toast } from 'react-hot-toast';
-import { calculateSalaryBreakdown, formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
+import { calculateCompensation, calculateNetInHand } from '@/lib/compensation';
 import {
   ArrowLeft,
   Save,
   Sparkles,
-  Building2,
+  Calculator,
   User,
   Banknote,
   ShieldCheck,
-  FileCheck,
   Briefcase,
   AlertCircle,
   Edit3,
-  Lock,
-  Unlock,
   CheckCircle2,
-  FolderOpen,
   ChevronRight,
   ChevronLeft
 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/Loading';
 
 interface FullEmployeeFormData {
   // Controlled ID
@@ -92,22 +90,16 @@ interface FullEmployeeFormData {
   esic: number;
   other_deductions: number;
   net_salary: number;
-
-  // Section E - KYC / Documents
-  kyc_pan_doc: string;
-  kyc_aadhaar_doc: string;
-  kyc_bank_proof: string;
-  kyc_resume: string;
-  kyc_education_doc: string;
-  kyc_experience_doc: string;
 }
+
+type SectionId = 'A' | 'B' | 'C' | 'D';
 
 export default function NewEmployeePage() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isEditingId, setIsEditingId] = useState(false);
-  const [activeSection, setActiveSection] = useState<'A' | 'B' | 'C' | 'D' | 'E'>('A');
+  const [activeSection, setActiveSection] = useState<SectionId>('A');
 
   const {
     register,
@@ -117,6 +109,7 @@ export default function NewEmployeePage() {
     trigger,
     formState: { errors }
   } = useForm<FullEmployeeFormData>({
+    mode: 'onBlur',
     defaultValues: {
       employee_id: 'Loading...',
       full_name: '',
@@ -148,7 +141,7 @@ export default function NewEmployeePage() {
       designation: 'Software Development Engineer',
       employment_type: 'FULL_TIME',
       work_location: 'Hyderabad, India',
-      reporting_manager: 'Rajesh Nair',
+      reporting_manager: '',
       probation_period: '6 months',
       confirmation_date: '',
       notice_period: '60 days',
@@ -161,11 +154,11 @@ export default function NewEmployeePage() {
       salary_structure: 'Standard Annual CTC',
       annual_ctc: 600000,
       variable_pay: 0,
-      basic: 25000,
-      hra: 12500,
-      special_allowance: 9800,
+      basic: 20000,
+      hra: 10000,
+      special_allowance: 12400,
       conveyance: 1600,
-      other_allowances: 1100,
+      other_allowances: 6000,
       monthly_gross: 50000,
       employee_pf: 1800,
       employer_pf: 1800,
@@ -173,14 +166,7 @@ export default function NewEmployeePage() {
       tds: 0,
       esic: 0,
       other_deductions: 0,
-      net_salary: 46200,
-
-      kyc_pan_doc: '',
-      kyc_aadhaar_doc: '',
-      kyc_bank_proof: '',
-      kyc_resume: '',
-      kyc_education_doc: '',
-      kyc_experience_doc: '',
+      net_salary: 45238,
     }
   });
 
@@ -189,6 +175,16 @@ export default function NewEmployeePage() {
   const variablePay = watch('variable_pay') || 0;
   const watchDepartmentId = watch('department_id');
   const watchFullName = watch('full_name');
+
+  // Watched deduction & earning fields for live Net In-Hand computation
+  const watchMonthlyGross = watch('monthly_gross');
+  const watchBasic = watch('basic');
+  const watchEmployeePf = watch('employee_pf');
+  const watchEmployerPf = watch('employer_pf');
+  const watchPt = watch('professional_tax');
+  const watchTds = watch('tds');
+  const watchEsic = watch('esic');
+  const watchOtherDeductions = watch('other_deductions');
 
   // Load next sequential employee ID on mount
   useEffect(() => {
@@ -219,8 +215,45 @@ export default function NewEmployeePage() {
     }
   }, [watchFullName, setValue, watch]);
 
+  // Live Net-In-Hand Recalculation whenever earnings or deduction fields change
+  useEffect(() => {
+    const gross = Number(watchMonthlyGross) || 0;
+    const empPf = Number(watchEmployeePf) || 0;
+    const emplyrPf = Number(watchEmployerPf) || 0;
+    const pt = Number(watchPt) || 0;
+    const b = Number(watchBasic) || 0;
+    const gratuity = Math.round((b * 15) / (26 * 12));
+    const tdsVal = Number(watchTds) || 0;
+    const esicVal = Number(watchEsic) || 0;
+    const otherDed = Number(watchOtherDeductions) || 0;
+
+    const res = calculateNetInHand({
+      monthlyGross: gross,
+      employeePf: empPf,
+      employerPf: emplyrPf,
+      professionalTax: pt,
+      gratuity,
+      tds: tdsVal,
+      esic: esicVal,
+      otherDeductions: otherDed,
+    });
+
+    setValue('net_salary', res.netSalary);
+  }, [
+    watchMonthlyGross,
+    watchBasic,
+    watchEmployeePf,
+    watchEmployerPf,
+    watchPt,
+    watchTds,
+    watchEsic,
+    watchOtherDeductions,
+    setValue
+  ]);
+
+  // Action A: Auto-Calculate Breakdown from Annual CTC
   const handleRecalculateSalary = () => {
-    const b = calculateSalaryBreakdown(annualCtc, variablePay);
+    const b = calculateCompensation(annualCtc, variablePay);
     setValue('basic', b.basic);
     setValue('hra', b.hra);
     setValue('monthly_gross', b.monthlyGross);
@@ -231,6 +264,35 @@ export default function NewEmployeePage() {
     setValue('net_salary', b.netSalary);
     setValue('special_allowance', Math.max(0, b.monthlyGross - (b.basic + b.hra + 1600)));
     setValue('conveyance', 1600);
+    setValue('other_allowances', b.otherAllowances);
+    toast.success('Salary component breakdown auto-calculated.');
+  };
+
+  // Action B: Calculate Net In-Hand from current values displayed in deduction fields
+  const handleCalculateInHand = () => {
+    const gross = Number(watch('monthly_gross')) || 0;
+    const empPf = Number(watch('employee_pf')) || 0;
+    const emplyrPf = Number(watch('employer_pf')) || 0;
+    const pt = Number(watch('professional_tax')) || 0;
+    const b = Number(watch('basic')) || 0;
+    const gratuity = Math.round((b * 15) / (26 * 12));
+    const tdsVal = Number(watch('tds')) || 0;
+    const esicVal = Number(watch('esic')) || 0;
+    const otherDedVal = Number(watch('other_deductions')) || 0;
+
+    const res = calculateNetInHand({
+      monthlyGross: gross,
+      employeePf: empPf,
+      employerPf: emplyrPf,
+      professionalTax: pt,
+      gratuity,
+      tds: tdsVal,
+      esic: esicVal,
+      otherDeductions: otherDedVal,
+    });
+
+    setValue('net_salary', res.netSalary);
+    toast.success(`Net In-Hand recalculated: ${formatCurrency(res.netSalary)}`);
   };
 
   const onSubmit = async (data: FullEmployeeFormData) => {
@@ -243,6 +305,55 @@ export default function NewEmployeePage() {
       setSubmitting(false);
       return;
     }
+
+    // Ensure Step 4 Bank fields are present & validated
+    const bankName = data.bank_name?.trim();
+    const accountHolder = data.bank_account_holder_name?.trim();
+    const accountNumber = data.bank_account_number?.trim();
+    const ifsc = data.bank_ifsc?.trim().toUpperCase();
+
+    if (!bankName) {
+      setError('Bank Name is required.');
+      setSubmitting(false);
+      return;
+    }
+    if (!accountHolder) {
+      setError('Account Holder Name is required.');
+      setSubmitting(false);
+      return;
+    }
+    if (!accountNumber || !/^[0-9]{9,18}$/.test(accountNumber)) {
+      setError('Please provide a valid Indian Bank Account Number (9 to 18 numeric digits).');
+      setSubmitting(false);
+      return;
+    }
+    if (!ifsc || !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
+      setError('Please provide a valid 11-character Indian IFSC code (e.g. HDFC0001234).');
+      setSubmitting(false);
+      return;
+    }
+
+    // Compute final authoritative Net In-Hand from current values before saving
+    const finalGross = Number(data.monthly_gross) || 0;
+    const finalEmpPf = Number(data.employee_pf) || 0;
+    const finalEmplyrPf = Number(data.employer_pf) || 0;
+    const finalPt = Number(data.professional_tax) || 0;
+    const finalBasic = Number(data.basic) || 0;
+    const finalGratuity = Math.round((finalBasic * 15) / (26 * 12));
+    const finalTds = Number(data.tds) || 0;
+    const finalEsic = Number(data.esic) || 0;
+    const finalOtherDed = Number(data.other_deductions) || 0;
+
+    const computedNet = calculateNetInHand({
+      monthlyGross: finalGross,
+      employeePf: finalEmpPf,
+      employerPf: finalEmplyrPf,
+      professionalTax: finalPt,
+      gratuity: finalGratuity,
+      tds: finalTds,
+      esic: finalEsic,
+      otherDeductions: finalOtherDed,
+    }).netSalary;
 
     try {
       const payload = {
@@ -259,12 +370,12 @@ export default function NewEmployeePage() {
         alternate_phone: data.alternate_phone?.trim() || undefined,
         address: data.address.trim(),
         current_address: data.current_address?.trim() || undefined,
-        city: data.city?.trim() || undefined,
-        state: data.state?.trim() || undefined,
+        city: data.city.trim(),
+        state: data.state.trim(),
         country: data.country?.trim() || 'India',
-        pin_code: data.pin_code?.trim() || undefined,
+        pin_code: data.pin_code.trim(),
 
-        // Section B
+        // Section B - Identity / Statutory
         pan_number: data.pan_number?.trim() || undefined,
         aadhaar_number: data.aadhaar_number?.trim() || undefined,
         passport_number: data.passport_number?.trim() || undefined,
@@ -272,7 +383,7 @@ export default function NewEmployeePage() {
         pf_number: data.pf_number?.trim() || undefined,
         esic_number: data.esic_number?.trim() || undefined,
 
-        // Section C
+        // Section C - Employment Details
         joining_date: data.joining_date,
         department_id: data.department_id,
         custom_department: data.custom_department?.trim() || undefined,
@@ -288,39 +399,32 @@ export default function NewEmployeePage() {
         last_working_date: data.last_working_date || undefined,
         separation_reason: data.separation_reason?.trim() || undefined,
 
-        // Section D - Bank Info
-        bank_name: data.bank_name?.trim() || undefined,
-        bank_account_holder_name: data.bank_account_holder_name?.trim() || undefined,
-        bank_account_number: data.bank_account_number?.trim() || undefined,
-        bank_ifsc: data.bank_ifsc?.trim() || undefined,
+        // Section D - Bank & Payroll
+        bank_name: bankName,
+        bank_account_holder_name: accountHolder,
+        bank_account_number: accountNumber,
+        bank_ifsc: ifsc,
         salary_structure: data.salary_structure || undefined,
 
         // Section D - Salary Breakdown Payload
         salary: {
           annual_ctc: Number(data.annual_ctc) || 0,
-          monthly_gross: Number(data.monthly_gross) || 0,
-          basic: Number(data.basic) || 0,
+          variable_pay: Number(data.variable_pay) || 0,
+          monthly_gross: finalGross,
+          basic: finalBasic,
           hra: Number(data.hra) || 0,
           special_allowance: Number(data.special_allowance) || 0,
           conveyance: Number(data.conveyance) || 0,
           other_allowances: Number(data.other_allowances) || 0,
-          employee_pf: Number(data.employee_pf) || 0,
-          employer_pf: Number(data.employer_pf) || 0,
-          professional_tax: Number(data.professional_tax) || 0,
-          tds: Number(data.tds) || 0,
-          esic: Number(data.esic) || 0,
-          other_deductions: Number(data.other_deductions) || 0,
-          net_salary: Number(data.net_salary) || 0,
-        },
-
-        // Section E - KYC References
-        kyc_documents: {
-          pan: data.kyc_pan_doc || undefined,
-          aadhaar: data.kyc_aadhaar_doc || undefined,
-          bank_proof: data.kyc_bank_proof || undefined,
-          resume: data.kyc_resume || undefined,
-          education: data.kyc_education_doc || undefined,
-          experience: data.kyc_experience_doc || undefined,
+          employee_pf: finalEmpPf,
+          employer_pf: finalEmplyrPf,
+          professional_tax: finalPt,
+          gratuity: finalGratuity,
+          tds: finalTds,
+          esic: finalEsic,
+          other_deductions: finalOtherDed,
+          net_salary: computedNet,
+          effective_date: data.joining_date || undefined,
         },
       };
 
@@ -335,6 +439,7 @@ export default function NewEmployeePage() {
         throw new Error(empData.error || 'Failed to create employee master record.');
       }
 
+      toast.success('Employee onboarded successfully!');
       router.push(`/employees/${empData.id}`);
       router.refresh();
     } catch (err: any) {
@@ -344,24 +449,32 @@ export default function NewEmployeePage() {
     }
   };
 
+  // Exactly 4 Onboarding Steps (KYC Step 5 Removed)
   const SECTIONS = [
     { id: 'A', step: 1, label: 'Personal Information', icon: User },
     { id: 'B', step: 2, label: 'Statutory & Identity', icon: ShieldCheck },
     { id: 'C', step: 3, label: 'Employment Details', icon: Briefcase },
     { id: 'D', step: 4, label: 'Bank & Payroll', icon: Banknote },
-    { id: 'E', step: 5, label: 'KYC & Documents', icon: FolderOpen },
   ] as const;
 
-  const handleNext = async (current: 'A' | 'B' | 'C' | 'D') => {
+  const handleNext = async (current: 'A' | 'B' | 'C') => {
     let isValid = true;
     if (current === 'A') {
-      isValid = await trigger(['full_name', 'email', 'personal_email', 'phone', 'employee_id']);
+      isValid = await trigger([
+        'full_name',
+        'gender',
+        'phone',
+        'address',
+        'city',
+        'state',
+        'pin_code',
+        'email',
+        'employee_id'
+      ]);
     } else if (current === 'B') {
       isValid = await trigger();
     } else if (current === 'C') {
-      isValid = await trigger(['joining_date', 'department_id', 'designation', 'employment_type']);
-    } else if (current === 'D') {
-      isValid = await trigger(['annual_ctc']);
+      isValid = await trigger(['joining_date', 'department_id', 'designation', 'employment_type', 'work_location']);
     }
 
     if (!isValid) {
@@ -372,14 +485,12 @@ export default function NewEmployeePage() {
     if (current === 'A') setActiveSection('B');
     else if (current === 'B') setActiveSection('C');
     else if (current === 'C') setActiveSection('D');
-    else if (current === 'D') setActiveSection('E');
   };
 
-  const handleBack = (current: 'B' | 'C' | 'D' | 'E') => {
+  const handleBack = (current: 'B' | 'C' | 'D') => {
     if (current === 'B') setActiveSection('A');
     else if (current === 'C') setActiveSection('B');
     else if (current === 'D') setActiveSection('C');
-    else if (current === 'E') setActiveSection('D');
   };
 
   return (
@@ -419,7 +530,7 @@ export default function NewEmployeePage() {
               <button
                 type="button"
                 onClick={() => setIsEditingId(false)}
-                className="text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded transition flex items-center gap-0.5"
+                className="text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded transition flex items-center gap-0.5 cursor-pointer"
               >
                 <CheckCircle2 className="h-3 w-3" /> Done
               </button>
@@ -449,13 +560,12 @@ export default function NewEmployeePage() {
         </div>
       )}
 
-      {/* 5-Step Progress Stepper */}
+      {/* 4-Step Progress Stepper */}
       <div className="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-2xs">
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {SECTIONS.map((sec) => {
-            const Icon = sec.icon;
             const isActive = activeSection === sec.id;
-            const stepOrder = ['A', 'B', 'C', 'D', 'E'];
+            const stepOrder: SectionId[] = ['A', 'B', 'C', 'D'];
             const isPassed = stepOrder.indexOf(activeSection) > stepOrder.indexOf(sec.id);
 
             return (
@@ -520,24 +630,39 @@ export default function NewEmployeePage() {
                 <label className="font-semibold text-slate-700 block mb-1">Full Legal Name *</label>
                 <input
                   type="text"
-                  required
-                  {...register('full_name', { required: true })}
-                  placeholder="e.g. Atal Kumar Pandey"
-                  className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600"
+                  {...register('full_name', {
+                    required: 'Full Legal Name is required',
+                    validate: (v) => !!v?.trim() || 'Full Legal Name cannot be empty or whitespace',
+                  })}
+                  placeholder="e.g. Full Legal Name"
+                  className={`w-full p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-blue-600 ${
+                    errors.full_name ? 'border-red-400 bg-red-50/20' : 'border-slate-300'
+                  }`}
                 />
+                {errors.full_name && (
+                  <p className="text-red-600 text-[11px] mt-1 font-medium">{errors.full_name.message}</p>
+                )}
               </div>
 
               <div>
                 <label className="font-semibold text-slate-700 block mb-1">Gender *</label>
                 <select
-                  {...register('gender')}
-                  className="w-full p-2.5 border border-slate-300 rounded-lg outline-none bg-white font-medium"
+                  {...register('gender', {
+                    required: 'Gender is required',
+                    validate: (v) => !!v?.trim() || 'Please select a valid gender',
+                  })}
+                  className={`w-full p-2.5 border rounded-lg outline-none bg-white font-medium ${
+                    errors.gender ? 'border-red-400 bg-red-50/20' : 'border-slate-300'
+                  }`}
                 >
                   <option value="Male">Male</option>
                   <option value="Female">Female</option>
                   <option value="Other">Other</option>
                   <option value="Prefer not to say">Prefer not to say</option>
                 </select>
+                {errors.gender && (
+                  <p className="text-red-600 text-[11px] mt-1 font-medium">{errors.gender.message}</p>
+                )}
               </div>
 
               <div>
@@ -573,11 +698,18 @@ export default function NewEmployeePage() {
                 <label className="font-semibold text-slate-700 block mb-1">Corporate Email *</label>
                 <input
                   type="email"
-                  required
-                  {...register('email', { required: true })}
+                  {...register('email', {
+                    required: 'Corporate Email is required',
+                    validate: (v) => !!v?.trim() || 'Corporate Email cannot be empty or whitespace',
+                  })}
                   placeholder="employee@varsaka.com"
-                  className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600"
+                  className={`w-full p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-blue-600 ${
+                    errors.email ? 'border-red-400 bg-red-50/20' : 'border-slate-300'
+                  }`}
                 />
+                {errors.email && (
+                  <p className="text-red-600 text-[11px] mt-1 font-medium">{errors.email.message}</p>
+                )}
               </div>
 
               <div>
@@ -594,11 +726,22 @@ export default function NewEmployeePage() {
                 <label className="font-semibold text-slate-700 block mb-1">Primary Contact Number *</label>
                 <input
                   type="text"
-                  required
-                  {...register('phone', { required: true })}
+                  {...register('phone', {
+                    required: 'Primary Contact Number is required',
+                    validate: (v) => {
+                      const trimmed = v?.trim() || '';
+                      if (!trimmed || trimmed === '+91') return 'Primary Contact Number cannot be empty';
+                      return true;
+                    },
+                  })}
                   placeholder="+91 9876543210"
-                  className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600"
+                  className={`w-full p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-blue-600 ${
+                    errors.phone ? 'border-red-400 bg-red-50/20' : 'border-slate-300'
+                  }`}
                 />
+                {errors.phone && (
+                  <p className="text-red-600 text-[11px] mt-1 font-medium">{errors.phone.message}</p>
+                )}
               </div>
 
               <div>
@@ -615,11 +758,18 @@ export default function NewEmployeePage() {
                 <label className="font-semibold text-slate-700 block mb-1">Permanent Address *</label>
                 <textarea
                   rows={2}
-                  required
-                  {...register('address', { required: true })}
+                  {...register('address', {
+                    required: 'Permanent Address is required',
+                    validate: (v) => !!v?.trim() || 'Permanent Address cannot be empty or whitespace',
+                  })}
                   placeholder="Full permanent residential address"
-                  className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 resize-none"
+                  className={`w-full p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-blue-600 resize-none ${
+                    errors.address ? 'border-red-400 bg-red-50/20' : 'border-slate-300'
+                  }`}
                 />
+                {errors.address && (
+                  <p className="text-red-600 text-[11px] mt-1 font-medium">{errors.address.message}</p>
+                )}
               </div>
 
               <div className="md:col-span-2 lg:col-span-3">
@@ -633,33 +783,65 @@ export default function NewEmployeePage() {
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">City</label>
+                <label className="font-semibold text-slate-700 block mb-1">City *</label>
                 <input
                   type="text"
-                  {...register('city')}
-                  placeholder="Hyderabad"
-                  className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600"
+                  {...register('city', {
+                    required: 'City is required',
+                    validate: (v) => !!v?.trim() || 'City cannot be empty or whitespace',
+                  })}
+                  placeholder="e.g. Hyderabad"
+                  className={`w-full p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-blue-600 ${
+                    errors.city ? 'border-red-400 bg-red-50/20' : 'border-slate-300'
+                  }`}
                 />
+                {errors.city && (
+                  <p className="text-red-600 text-[11px] mt-1 font-medium">{errors.city.message}</p>
+                )}
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">State</label>
+                <label className="font-semibold text-slate-700 block mb-1">State *</label>
                 <input
                   type="text"
-                  {...register('state')}
-                  placeholder="Telangana"
-                  className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600"
+                  {...register('state', {
+                    required: 'State is required',
+                    validate: (v) => !!v?.trim() || 'State cannot be empty or whitespace',
+                  })}
+                  placeholder="e.g. Telangana"
+                  className={`w-full p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-blue-600 ${
+                    errors.state ? 'border-red-400 bg-red-50/20' : 'border-slate-300'
+                  }`}
                 />
+                {errors.state && (
+                  <p className="text-red-600 text-[11px] mt-1 font-medium">{errors.state.message}</p>
+                )}
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">PIN Code</label>
+                <label className="font-semibold text-slate-700 block mb-1">PIN Code *</label>
                 <input
                   type="text"
-                  {...register('pin_code')}
-                  placeholder="500081"
-                  className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600"
+                  {...register('pin_code', {
+                    required: 'PIN Code is required',
+                    validate: (v) => {
+                      const trimmed = v?.trim() || '';
+                      if (!trimmed) return 'PIN Code cannot be empty or whitespace';
+                      if (!/^[1-9][0-9]{5}$/.test(trimmed)) {
+                        return 'Enter a valid 6-digit Indian PIN Code (e.g. 500081)';
+                      }
+                      return true;
+                    },
+                  })}
+                  placeholder="e.g. 500081"
+                  maxLength={6}
+                  className={`w-full p-2.5 border rounded-lg outline-none font-mono focus:ring-2 focus:ring-blue-600 ${
+                    errors.pin_code ? 'border-red-400 bg-red-50/20' : 'border-slate-300'
+                  }`}
                 />
+                {errors.pin_code && (
+                  <p className="text-red-600 text-[11px] mt-1 font-medium">{errors.pin_code.message}</p>
+                )}
               </div>
             </div>
           </div>
@@ -765,16 +947,20 @@ export default function NewEmployeePage() {
                 <label className="font-semibold text-slate-700 block mb-1">Date of Joining *</label>
                 <input
                   type="date"
-                  required
-                  {...register('joining_date', { required: true })}
-                  className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600"
+                  {...register('joining_date', { required: 'Joining date is required' })}
+                  className={`w-full p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-blue-600 ${
+                    errors.joining_date ? 'border-red-400 bg-red-50/20' : 'border-slate-300'
+                  }`}
                 />
+                {errors.joining_date && (
+                  <p className="text-red-600 text-[11px] mt-1 font-medium">{errors.joining_date.message}</p>
+                )}
               </div>
 
               <div>
                 <label className="font-semibold text-slate-700 block mb-1">Department *</label>
                 <select
-                  {...register('department_id')}
+                  {...register('department_id', { required: 'Department is required' })}
                   className="w-full p-2.5 border border-slate-300 rounded-lg outline-none bg-white font-medium"
                 >
                   <option value="dept-eng">Engineering &amp; Technology</option>
@@ -790,11 +976,13 @@ export default function NewEmployeePage() {
                   <label className="font-semibold text-blue-700 block mb-1">Custom Department Name *</label>
                   <input
                     type="text"
-                    required
-                    {...register('custom_department')}
+                    {...register('custom_department', { required: 'Custom Department Name is required' })}
                     placeholder="Enter department name"
                     className="w-full p-2.5 border border-blue-400 bg-blue-50/30 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 font-bold"
                   />
+                  {errors.custom_department && (
+                    <p className="text-red-600 text-[11px] mt-1 font-medium">{errors.custom_department.message}</p>
+                  )}
                 </div>
               )}
 
@@ -802,11 +990,18 @@ export default function NewEmployeePage() {
                 <label className="font-semibold text-slate-700 block mb-1">Designation / Role Title *</label>
                 <input
                   type="text"
-                  required
-                  {...register('designation', { required: true })}
+                  {...register('designation', {
+                    required: 'Designation is required',
+                    validate: (v) => !!v?.trim() || 'Designation cannot be empty',
+                  })}
                   placeholder="e.g. Senior Backend Engineer"
-                  className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600"
+                  className={`w-full p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-blue-600 ${
+                    errors.designation ? 'border-red-400 bg-red-50/20' : 'border-slate-300'
+                  }`}
                 />
+                {errors.designation && (
+                  <p className="text-red-600 text-[11px] mt-1 font-medium">{errors.designation.message}</p>
+                )}
               </div>
 
               <div>
@@ -825,11 +1020,18 @@ export default function NewEmployeePage() {
                 <label className="font-semibold text-slate-700 block mb-1">Work Location *</label>
                 <input
                   type="text"
-                  required
-                  {...register('work_location', { required: true })}
-                  placeholder="Hyderabad, India"
-                  className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600"
+                  {...register('work_location', {
+                    required: 'Work Location is required',
+                    validate: (v) => !!v?.trim() || 'Work Location cannot be empty',
+                  })}
+                  placeholder="e.g. Hyderabad, India"
+                  className={`w-full p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-blue-600 ${
+                    errors.work_location ? 'border-red-400 bg-red-50/20' : 'border-slate-300'
+                  }`}
                 />
+                {errors.work_location && (
+                  <p className="text-red-600 text-[11px] mt-1 font-medium">{errors.work_location.message}</p>
+                )}
               </div>
 
               <div>
@@ -906,64 +1108,128 @@ export default function NewEmployeePage() {
               </span>
             </div>
 
-            {/* Bank Particulars */}
+            {/* Bank Particulars — MANDATORY FIELDS */}
             <div>
-              <h3 className="text-xs font-bold text-slate-700 mb-3 uppercase tracking-wider">Bank Coordinates</h3>
+              <h3 className="text-xs font-bold text-slate-700 mb-3 uppercase tracking-wider">
+                Bank Coordinates <span className="text-red-500">*</span>
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
                 <div>
-                  <label className="font-semibold text-slate-600 block mb-1">Bank Name</label>
+                  <label className="font-semibold text-slate-700 block mb-1">Bank Name *</label>
                   <input
                     type="text"
-                    {...register('bank_name')}
+                    {...register('bank_name', {
+                      required: 'Bank Name is required',
+                      validate: (v) => !!v?.trim() || 'Bank Name cannot be empty or whitespace',
+                    })}
                     placeholder="e.g. HDFC Bank"
-                    className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600"
+                    className={`w-full p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-blue-600 ${
+                      errors.bank_name ? 'border-red-400 bg-red-50/20' : 'border-slate-300'
+                    }`}
                   />
+                  {errors.bank_name && (
+                    <p className="text-red-600 text-[11px] mt-1 font-medium">{errors.bank_name.message}</p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="font-semibold text-slate-600 block mb-1">Account Holder Name</label>
+                  <label className="font-semibold text-slate-700 block mb-1">Account Holder Name *</label>
                   <input
                     type="text"
-                    {...register('bank_account_holder_name')}
+                    {...register('bank_account_holder_name', {
+                      required: 'Account Holder Name is required',
+                      validate: (v) => !!v?.trim() || 'Account Holder Name cannot be empty or whitespace',
+                    })}
                     placeholder="Full name on bank account"
-                    className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600"
+                    className={`w-full p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-blue-600 ${
+                      errors.bank_account_holder_name ? 'border-red-400 bg-red-50/20' : 'border-slate-300'
+                    }`}
                   />
+                  {errors.bank_account_holder_name && (
+                    <p className="text-red-600 text-[11px] mt-1 font-medium">{errors.bank_account_holder_name.message}</p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="font-semibold text-slate-600 block mb-1">Bank Account Number</label>
+                  <label className="font-semibold text-slate-700 block mb-1">Bank Account Number *</label>
                   <input
                     type="text"
-                    {...register('bank_account_number')}
-                    placeholder="Account number"
-                    className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 font-mono"
+                    {...register('bank_account_number', {
+                      required: 'Bank Account Number is required',
+                      validate: (v) => {
+                        const trimmed = v?.trim() || '';
+                        if (!trimmed) return 'Bank Account Number cannot be empty or whitespace';
+                        if (!/^[0-9]{9,18}$/.test(trimmed)) {
+                          return 'Enter a valid bank account number (9 to 18 digits)';
+                        }
+                        return true;
+                      },
+                    })}
+                    placeholder="e.g. 50100123456789"
+                    className={`w-full p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-blue-600 font-mono ${
+                      errors.bank_account_number ? 'border-red-400 bg-red-50/20' : 'border-slate-300'
+                    }`}
                   />
+                  {errors.bank_account_number && (
+                    <p className="text-red-600 text-[11px] mt-1 font-medium">{errors.bank_account_number.message}</p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="font-semibold text-slate-600 block mb-1">IFSC Code</label>
+                  <label className="font-semibold text-slate-700 block mb-1">IFSC Code *</label>
                   <input
                     type="text"
-                    {...register('bank_ifsc')}
+                    {...register('bank_ifsc', {
+                      required: 'IFSC Code is required',
+                      validate: (v) => {
+                        const trimmed = v?.trim().toUpperCase() || '';
+                        if (!trimmed) return 'IFSC Code cannot be empty or whitespace';
+                        if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(trimmed)) {
+                          return 'Enter a valid 11-character Indian IFSC (e.g. HDFC0001234)';
+                        }
+                        return true;
+                      },
+                    })}
                     placeholder="e.g. HDFC0001234"
-                    className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 font-mono uppercase"
+                    maxLength={11}
+                    className={`w-full p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-blue-600 font-mono uppercase ${
+                      errors.bank_ifsc ? 'border-red-400 bg-red-50/20' : 'border-slate-300'
+                    }`}
                   />
+                  {errors.bank_ifsc && (
+                    <p className="text-red-600 text-[11px] mt-1 font-medium">{errors.bank_ifsc.message}</p>
+                  )}
                 </div>
               </div>
             </div>
 
             {/* Compensation & Structure */}
             <div className="border-t border-slate-100 pt-4 space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Salary Structure &amp; Breakdown</h3>
-                <button
-                  type="button"
-                  onClick={handleRecalculateSalary}
-                  className="px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-bold transition flex items-center gap-1.5"
-                >
-                  <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
-                  Auto-Calculate Breakdown
-                </button>
+                
+                {/* Actions: Auto-Calculate Breakdown + Live Calculate In-Hand */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleRecalculateSalary}
+                    className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    title="Calculate standard breakdown based on Annual CTC"
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
+                    Auto-Calculate Breakdown
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleCalculateInHand}
+                    className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-300 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    title="Calculate Net In-Hand from current values displayed in deduction fields"
+                  >
+                    <Calculator className="h-3.5 w-3.5 text-blue-600" />
+                    Calculate In-Hand
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs bg-slate-50 p-4 rounded-xl border border-slate-200">
@@ -988,13 +1254,19 @@ export default function NewEmployeePage() {
                 </div>
 
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Monthly Net In-Hand (INR)</label>
+                  <label className="font-semibold text-emerald-800 block mb-1 flex items-center justify-between">
+                    <span>Monthly Net In-Hand (INR)</span>
+                    <span className="text-[10px] text-emerald-600 font-normal">Live</span>
+                  </label>
                   <input
                     type="number"
                     {...register('net_salary', { valueAsNumber: true })}
                     className="w-full p-2 border border-emerald-300 rounded-lg font-mono font-bold text-emerald-700 bg-emerald-50/50"
                   />
-                  <span className="text-[10px] text-emerald-600 mt-0.5 block">{formatCurrency(watch('net_salary') || 0)} take-home</span>
+                  <div className="flex items-center justify-between mt-1 text-[10px]">
+                    <span className="font-bold text-emerald-700">{formatCurrency(watch('net_salary') || 0)} take-home</span>
+                    <span className="text-slate-500 italic">Calculated from current earnings and deductions</span>
+                  </div>
                 </div>
               </div>
 
@@ -1068,87 +1340,10 @@ export default function NewEmployeePage() {
           </div>
         )}
 
-        {/* ========================================================================= */}
-        {/* SECTION E — DOCUMENT / KYC REFERENCES                                     */}
-        {/* ========================================================================= */}
-        {activeSection === 'E' && (
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-5">
-            <div className="border-b border-slate-100 pb-3">
-              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <FolderOpen className="h-4 w-4 text-amber-600" />
-                SECTION E — DOCUMENT &amp; KYC REFERENCES
-              </h2>
-              <p className="text-xs text-slate-500">Record verification references, repository keys, or file identifiers for compliance</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">PAN Document Key / File ID</label>
-                <input
-                  type="text"
-                  {...register('kyc_pan_doc')}
-                  placeholder="e.g. pan_card_vl1087.pdf"
-                  className="w-full p-2.5 border border-slate-300 rounded-lg outline-none font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">Identity / Aadhaar Document Key</label>
-                <input
-                  type="text"
-                  {...register('kyc_aadhaar_doc')}
-                  placeholder="e.g. aadhaar_vl1087.pdf"
-                  className="w-full p-2.5 border border-slate-300 rounded-lg outline-none font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">Bank Proof (Cheque / Passbook Key)</label>
-                <input
-                  type="text"
-                  {...register('kyc_bank_proof')}
-                  placeholder="e.g. cancelled_cheque_vl1087.pdf"
-                  className="w-full p-2.5 border border-slate-300 rounded-lg outline-none font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">Resume / CV Document Key</label>
-                <input
-                  type="text"
-                  {...register('kyc_resume')}
-                  placeholder="e.g. cv_resume_vl1087.pdf"
-                  className="w-full p-2.5 border border-slate-300 rounded-lg outline-none font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">Educational Documents Reference</label>
-                <input
-                  type="text"
-                  {...register('kyc_education_doc')}
-                  placeholder="e.g. btech_degree_vl1087.pdf"
-                  className="w-full p-2.5 border border-slate-300 rounded-lg outline-none font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">Experience / Relieving Proof from Previous Employer</label>
-                <input
-                  type="text"
-                  {...register('kyc_experience_doc')}
-                  placeholder="e.g. exp_letter_previous.pdf"
-                  className="w-full p-2.5 border border-slate-300 rounded-lg outline-none font-mono"
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Bottom Wizard Navigation Action Bar */}
         <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <div className="flex items-center gap-2 text-xs text-slate-500">
-            <span>Step <strong>{activeSection === 'A' ? 1 : activeSection === 'B' ? 2 : activeSection === 'C' ? 3 : activeSection === 'D' ? 4 : 5}</strong> of 5</span>
+            <span>Step <strong>{activeSection === 'A' ? 1 : activeSection === 'B' ? 2 : activeSection === 'C' ? 3 : 4}</strong> of 4</span>
             <span className="text-slate-300">|</span>
             <span>Target Employee ID: <strong className="font-mono text-blue-800">{watchEmpId}</strong></span>
           </div>
@@ -1164,7 +1359,7 @@ export default function NewEmployeePage() {
             ) : (
               <button
                 type="button"
-                onClick={() => handleBack(activeSection as 'B' | 'C' | 'D' | 'E')}
+                onClick={() => handleBack(activeSection as 'B' | 'C' | 'D')}
                 className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition flex items-center gap-1 cursor-pointer"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -1172,10 +1367,10 @@ export default function NewEmployeePage() {
               </button>
             )}
 
-            {activeSection !== 'E' ? (
+            {activeSection !== 'D' ? (
               <button
                 type="button"
-                onClick={() => handleNext(activeSection as 'A' | 'B' | 'C' | 'D')}
+                onClick={() => handleNext(activeSection as 'A' | 'B' | 'C')}
                 className="px-5 py-2.5 rounded-lg text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-600/20 transition flex items-center gap-1.5 cursor-pointer"
               >
                 <span>Next</span>
@@ -1185,14 +1380,24 @@ export default function NewEmployeePage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className={`px-5 py-2.5 rounded-lg text-xs font-bold text-white transition flex items-center gap-2 cursor-pointer ${
+                aria-busy={submitting}
+                className={`px-5 py-2.5 rounded-lg text-xs font-bold text-white transition flex items-center gap-2 select-none ${
                   submitting
-                    ? 'bg-blue-400 cursor-not-allowed'
-                    : 'bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20'
+                    ? 'bg-emerald-500 cursor-not-allowed opacity-80'
+                    : 'bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20 cursor-pointer'
                 }`}
               >
-                <Save className="h-4 w-4" />
-                {submitting ? 'Creating Master Record...' : 'Complete Onboarding & Save'}
+                {submitting ? (
+                  <>
+                    <LoadingSpinner size="sm" variant="white" label="Creating Master Record..." />
+                    <span>Creating Master Record...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4" />
+                    <span>Complete Onboarding &amp; Save</span>
+                  </>
+                )}
               </button>
             )}
           </div>

@@ -6,6 +6,9 @@ import { logAuditEvent, logSecurityEvent } from '@/lib/audit';
 import { DocumentType } from '@/types/database';
 import { validateVerificationDomain } from '@/lib/utils';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(req: NextRequest) {
   try {
     const user = await requireAuthUser();
@@ -13,7 +16,10 @@ export async function GET(req: NextRequest) {
     const type = searchParams.get('type') || undefined;
     const status = searchParams.get('status') || undefined;
     const employeeId = searchParams.get('employeeId') || undefined;
-    const search = searchParams.get('search') || undefined;
+    
+    // Explicitly treat empty or whitespace-only search string as no search filter
+    const rawSearch = searchParams.get('search');
+    const search = rawSearch && rawSearch.trim() ? rawSearch.trim() : undefined;
 
     // Permission check for salary documents
     const canViewSalary = hasPermission(user, 'salary.view') || hasPermission(user, 'document.salary.view') || user.role === 'SUPER_ADMIN';
@@ -34,7 +40,13 @@ export async function GET(req: NextRequest) {
     // Non-payroll users must NOT receive SALARY_SLIP records at all
     const filteredList = canViewSalary ? list : list.filter((d) => d.document_type !== 'SALARY_SLIP');
 
-    return NextResponse.json(filteredList);
+    return NextResponse.json(filteredList, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        Pragma: 'no-cache',
+        Expires: '0',
+      },
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: error.status || 500 });
   }

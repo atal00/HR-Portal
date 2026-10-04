@@ -51,7 +51,7 @@ export const Breadcrumb: React.FC = () => {
     <nav aria-label="Breadcrumb" className="flex items-center space-x-2 text-xs text-slate-500 py-1">
       <Link
         href="/dashboard"
-        className="flex items-center gap-1.5 hover:text-blue-600 transition font-medium"
+        className="flex items-center gap-1.5 hover:text-blue-600 transition font-medium cursor-pointer"
       >
         <Home className="h-3.5 w-3.5" />
         <span>Varsaka HR</span>
@@ -67,7 +67,7 @@ export const Breadcrumb: React.FC = () => {
           ) : (
             <Link
               href={crumb.url}
-              className="hover:text-blue-600 transition font-medium capitalize"
+              className="hover:text-blue-600 transition font-medium capitalize cursor-pointer"
             >
               {crumb.label}
             </Link>

@@ -60,6 +60,17 @@ export interface OfferLetterData {
   monthlyNetSalary: number;
   yearlyVariable: number;
 
+  // Net In-Hand Calculation & Controlled Override Snapshot (Requirement E)
+  calculatedNetInHand?: number;
+  finalNetInHand?: number;
+  netInHandMode?: 'AUTO' | 'MANUAL';
+  overrideReason?: string;
+  overriddenBy?: string;
+  overriddenAt?: string;
+
+  // Controlled Offer Letter Typography Setting (Requirement 5)
+  fontFamily?: 'default' | 'old-style' | 'typewriter';
+
   // Signatory & Stamp Snapshot
   signatory?: DocumentSignatorySnapshot;
   stamp?: DocumentStampSnapshot;

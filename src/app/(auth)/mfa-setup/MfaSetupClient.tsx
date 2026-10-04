@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogOut } from 'lucide-react';
 import MfaEnrollmentCard from '@/components/auth/MfaEnrollmentCard';
+import { LoadingSpinner } from '@/components/ui/Loading';
 
 interface MfaSetupClientProps {
   userEmail: string;
@@ -78,9 +79,11 @@ export default function MfaSetupClient({ userEmail }: MfaSetupClientProps) {
             type="button"
             onClick={handleLogout}
             disabled={loggingOut}
+            aria-busy={loggingOut}
+            aria-disabled={loggingOut}
             className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 transition cursor-pointer font-medium disabled:opacity-50"
           >
-            <LogOut className="h-3.5 w-3.5" />
+            {loggingOut ? <LoadingSpinner size="xs" variant="slate" /> : <LogOut className="h-3.5 w-3.5" />}
             <span>{loggingOut ? 'Signing out...' : 'Sign out and return to login'}</span>
           </button>
         </div>

@@ -13,6 +13,7 @@ import { RelievingLetterTemplate } from '@/components/documents/RelievingLetterT
 import { SalarySlipTemplate } from '@/components/documents/SalarySlipTemplate';
 import { CertificateTemplate } from '@/components/documents/CertificateTemplate';
 import { toast } from 'react-hot-toast';
+import { PageLoader, LoadingSpinner } from '@/components/ui/Loading';
 import {
   FileText,
   ArrowLeft,
@@ -211,7 +212,14 @@ export default function DocumentDetailsPage() {
     }
   };
 
-  if (loading) return <div className="p-12 text-center text-xs text-slate-500">Loading document...</div>;
+  if (loading) {
+    return (
+      <PageLoader
+        title="Loading Document Record..."
+        subtitle="Retrieving document metadata, cryptographic verification tokens, and rendered preview snapshot."
+      />
+    );
+  }
   if (error || !doc) return <div className="p-12 text-center text-xs text-red-600">{error || 'Document not found'}</div>;
 
   const isApproved = doc.status === 'APPROVED';
@@ -449,9 +457,11 @@ export default function DocumentDetailsPage() {
                 type="button"
                 onClick={handleApprove}
                 disabled={actionLoading}
-                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold transition disabled:opacity-50 cursor-pointer"
+                aria-busy={actionLoading}
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
               >
-                {actionLoading ? 'Approving...' : 'Confirm Approval'}
+                {actionLoading && <LoadingSpinner size="xs" variant="white" label="Approving..." />}
+                <span>{actionLoading ? 'Approving...' : 'Confirm Approval'}</span>
               </button>
             </div>
           </div>
@@ -537,9 +547,11 @@ export default function DocumentDetailsPage() {
                 <button
                   type="submit"
                   disabled={actionLoading || rejectReason.trim().length < 5}
-                  className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold transition disabled:opacity-50 cursor-pointer"
+                  aria-busy={actionLoading}
+                  className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
                 >
-                  {actionLoading ? 'Rejecting...' : 'Reject Document'}
+                  {actionLoading && <LoadingSpinner size="xs" variant="white" label="Rejecting..." />}
+                  <span>{actionLoading ? 'Rejecting...' : 'Reject Document'}</span>
                 </button>
               </div>
             </form>
@@ -600,9 +612,11 @@ export default function DocumentDetailsPage() {
                 <button
                   type="submit"
                   disabled={actionLoading || !revokeConfirmed || revokeReason.length < 5}
-                  className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold transition disabled:opacity-50"
+                  aria-busy={actionLoading}
+                  className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
                 >
-                  {actionLoading ? 'Revoking...' : 'Confirm Revocation'}
+                  {actionLoading && <LoadingSpinner size="xs" variant="white" label="Revoking..." />}
+                  <span>{actionLoading ? 'Revoking...' : 'Confirm Revocation'}</span>
                 </button>
               </div>
             </form>
@@ -651,9 +665,11 @@ export default function DocumentDetailsPage() {
                 <button
                   type="submit"
                   disabled={actionLoading || versionReason.length < 5}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition disabled:opacity-50"
+                  aria-busy={actionLoading}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
                 >
-                  {actionLoading ? 'Creating Version...' : 'Generate New Version'}
+                  {actionLoading && <LoadingSpinner size="xs" variant="white" label="Creating Version..." />}
+                  <span>{actionLoading ? 'Creating Version...' : 'Generate New Version'}</span>
                 </button>
               </div>
             </form>

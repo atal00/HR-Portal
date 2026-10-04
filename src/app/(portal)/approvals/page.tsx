@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { DocumentRecord, DocumentType } from '@/types/database';
+import { DocumentRecord } from '@/types/database';
 import { SessionUser } from '@/types/auth';
 import { canApproveDocument, hasPermission } from '@/lib/rbac';
 import { formatDate } from '@/lib/utils';
@@ -16,14 +16,8 @@ import {
   X,
   AlertCircle,
   Filter,
-  CheckSquare,
-  Square,
-  Lock,
-  Layers,
-  Banknote,
-  FileText,
-  FileSpreadsheet,
-  Award
+  Trash2,
+  Lock
 } from 'lucide-react';
 
 type SectionFilter = 'ALL' | 'PAYROLL' | 'OFFER' | 'EXPERIENCE' | 'RELIEVING' | 'CERTIFICATE';
@@ -39,6 +33,15 @@ export default function ApprovalsPage() {
 
   // Multi-Select State
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const headerCheckboxRef = useRef<HTMLInputElement>(null);
+
+  // Bulk Approve Modal State
+  const [bulkApproveModalOpen, setBulkApproveModalOpen] = useState(false);
+
+  // Bulk Delete Modal State
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [deleteError, setDeleteError] = useState('');
 
   // Professional Rejection Modal State
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
@@ -89,6 +92,16 @@ export default function ApprovalsPage() {
     if (sectionFilter === 'CERTIFICATE') return pendingDocs.filter((d) => d.document_type === 'CERTIFICATE');
     return pendingDocs;
   }, [pendingDocs, sectionFilter]);
+
+  // Synchronize selections with active filter
+  useEffect(() => {
+    setSelectedIds((prev) => prev.filter((id) => filteredDocs.some((d) => d.id === id)));
+  }, [sectionFilter, filteredDocs]);
+
+  // Selected document objects
+  const selectedDocuments = useMemo(() => {
+    return pendingDocs.filter((d) => selectedIds.includes(d.id));
+  }, [pendingDocs, selectedIds]);
 
   // Handle single approval
   const handleApproveSingle = async (doc: DocumentRecord) => {
@@ -163,8 +176,16 @@ export default function ApprovalsPage() {
         });
 
         const data = await res.json();
-        if (res.ok) {
-          toast.success(`Bulk rejection completed: ${data.summary.succeeded} succeeded, ${data.summary.failed} failed.`);
+        if (res.ok && data.summary) {
+          const { succeeded, skipped = 0, failed } = data.summary;
+          if (failed === 0 && skipped === 0) {
+            toast.success(`Bulk rejection completed: ${succeeded} documents rejected.`);
+          } else {
+            toast(
+              `Bulk rejection: ${succeeded} succeeded, ${skipped} skipped, ${failed} failed.`,
+              { icon: failed > 0 ? '⚠️' : 'ℹ️' }
+            );
+          }
           setRejectModalOpen(false);
           setSelectedIds([]);
           await fetchData();
@@ -195,20 +216,25 @@ export default function ApprovalsPage() {
     }
   };
 
-  // Handle bulk approve
-  const handleApproveBulk = async () => {
+  // Determine delete permissions
+  const canDelete = currentUser
+    ? hasPermission(currentUser, 'document.delete') || currentUser.role === 'SUPER_ADMIN'
+    : false;
+
+  // Handle bulk approve confirmation
+  const handleConfirmBulkApprove = async () => {
     if (selectedIds.length === 0) return;
 
     // Check if any selected item is forbidden for the current user
-    const selectedDocuments = pendingDocs.filter((d) => selectedIds.includes(d.id));
     const unauthorized = selectedDocuments.filter((d) => !canApproveDocument(currentUser, d.document_type));
 
     if (unauthorized.length > 0) {
       toast.error(`Forbidden: You lack approval permissions for ${unauthorized.length} of the selected documents.`);
+      setBulkApproveModalOpen(false);
       return;
     }
 
-    setActionLoading('bulk');
+    setIsSubmitting(true);
     try {
       const res = await fetch('/api/documents/bulk-action', {
         method: 'POST',
@@ -220,8 +246,17 @@ export default function ApprovalsPage() {
       });
 
       const data = await res.json();
-      if (res.ok) {
-        toast.success(`Bulk approval completed: ${data.summary.succeeded} approved, ${data.summary.failed} failed.`);
+      if (res.ok && data.summary) {
+        const { succeeded, skipped = 0, failed } = data.summary;
+        if (failed === 0 && skipped === 0) {
+          toast.success(`Bulk approval completed: ${succeeded} documents approved.`);
+        } else {
+          toast(
+            `Bulk approval: ${succeeded} approved, ${skipped} skipped, ${failed} failed.`,
+            { icon: failed > 0 ? '⚠️' : 'ℹ️' }
+          );
+        }
+        setBulkApproveModalOpen(false);
         setSelectedIds([]);
         await fetchData();
       } else {
@@ -230,7 +265,62 @@ export default function ApprovalsPage() {
     } catch (err: any) {
       toast.error(err.message || 'Network error during bulk approval.');
     } finally {
-      setActionLoading(null);
+      setIsSubmitting(false);
+    }
+  };
+
+  // Open bulk delete modal
+  const handleOpenDeleteBulk = () => {
+    if (selectedIds.length === 0) return;
+    setDeleteReason('');
+    setDeleteError('');
+    setDeleteModalOpen(true);
+  };
+
+  // Confirm bulk delete
+  const handleConfirmDeleteBulk = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanReason = deleteReason.trim();
+    if (cleanReason.length < 3) {
+      setDeleteError('A deletion reason of at least 3 characters is mandatory.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setDeleteError('');
+
+    try {
+      const res = await fetch('/api/documents/bulk-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'DELETE',
+          documentIds: selectedIds,
+          reason: cleanReason,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.summary) {
+        const { succeeded, skipped = 0, failed } = data.summary;
+        if (failed === 0 && skipped === 0) {
+          toast.success(`Bulk deletion processed: ${succeeded} documents processed.`);
+        } else {
+          toast(
+            `Bulk deletion: ${succeeded} deleted/revoked, ${skipped} skipped, ${failed} failed.`,
+            { icon: failed > 0 ? '⚠️' : 'ℹ️' }
+          );
+        }
+        setDeleteModalOpen(false);
+        setSelectedIds([]);
+        await fetchData();
+      } else {
+        setDeleteError(data.error || 'Failed to process bulk deletion.');
+      }
+    } catch (err: any) {
+      setDeleteError(err.message || 'Network error processing bulk deletion.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -241,8 +331,17 @@ export default function ApprovalsPage() {
     );
   };
 
-  // Toggle select all in currently filtered list
-  const isAllSelected = filteredDocs.length > 0 && filteredDocs.every((d) => selectedIds.includes(d.id));
+  // Selection counts and states for visible/filtered list
+  const selectedInFilteredCount = filteredDocs.filter((d) => selectedIds.includes(d.id)).length;
+  const isAllSelected = filteredDocs.length > 0 && selectedInFilteredCount === filteredDocs.length;
+  const isPartiallySelected = selectedInFilteredCount > 0 && selectedInFilteredCount < filteredDocs.length;
+
+  // Sync indeterminate state to header checkbox element
+  useEffect(() => {
+    if (headerCheckboxRef.current) {
+      headerCheckboxRef.current.indeterminate = isPartiallySelected;
+    }
+  }, [isPartiallySelected]);
 
   const handleToggleSelectAll = () => {
     if (isAllSelected) {
@@ -305,8 +404,8 @@ export default function ApprovalsPage() {
           </span>
 
           <button
-            onClick={handleApproveBulk}
-            disabled={selectedIds.length === 0 || actionLoading === 'bulk'}
+            onClick={() => setBulkApproveModalOpen(true)}
+            disabled={selectedIds.length === 0 || isSubmitting}
             className="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
           >
             <CheckCircle2 className="h-4 w-4" />
@@ -315,12 +414,23 @@ export default function ApprovalsPage() {
 
           <button
             onClick={handleOpenRejectBulk}
-            disabled={selectedIds.length === 0 || actionLoading === 'bulk'}
-            className="px-3.5 py-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold border border-rose-200 text-xs transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
+            disabled={selectedIds.length === 0 || isSubmitting}
+            className="px-3.5 py-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold border border-amber-200 text-xs transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
           >
             <XCircle className="h-4 w-4" />
             <span>Reject Selected</span>
           </button>
+
+          {canDelete && (
+            <button
+              onClick={handleOpenDeleteBulk}
+              disabled={selectedIds.length === 0 || isSubmitting}
+              className="px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition shadow-xs disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span>Delete Selected</span>
+            </button>
+          )}
         </div>
 
       </div>
@@ -344,19 +454,17 @@ export default function ApprovalsPage() {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
                 <tr>
-                  <th className="px-4 py-3 w-10">
-                    <button
-                      type="button"
-                      onClick={handleToggleSelectAll}
-                      className="p-1 text-slate-600 hover:text-slate-900 cursor-pointer"
-                      title={isAllSelected ? 'Deselect All' : 'Select All'}
-                    >
-                      {isAllSelected ? (
-                        <CheckSquare className="h-4 w-4 text-blue-600" />
-                      ) : (
-                        <Square className="h-4 w-4 text-slate-400" />
-                      )}
-                    </button>
+                  <th className="px-4 py-3 w-10 text-center">
+                    <label className="inline-flex items-center justify-center cursor-pointer" title={isAllSelected ? 'Deselect All' : 'Select All'}>
+                      <input
+                        type="checkbox"
+                        ref={headerCheckboxRef}
+                        checked={isAllSelected}
+                        onChange={handleToggleSelectAll}
+                        aria-label="Select All"
+                        className="h-4 w-4 rounded border border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                      />
+                    </label>
                   </th>
                   <th className="px-4 py-3">Document Title &amp; Number</th>
                   <th className="px-4 py-3">Type</th>
@@ -379,18 +487,16 @@ export default function ApprovalsPage() {
                         isSelected ? 'bg-blue-50/50' : ''
                       }`}
                     >
-                      <td className="px-4 py-3.5">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleSelect(doc.id)}
-                          className="p-1 cursor-pointer"
-                        >
-                          {isSelected ? (
-                            <CheckSquare className="h-4 w-4 text-blue-600" />
-                          ) : (
-                            <Square className="h-4 w-4 text-slate-400 hover:text-slate-600" />
-                          )}
-                        </button>
+                      <td className="px-4 py-3.5 w-10 text-center">
+                        <label className="inline-flex items-center justify-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleToggleSelect(doc.id)}
+                            aria-label={`Select document ${doc.document_number}`}
+                            className="h-4 w-4 rounded border border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                          />
+                        </label>
                       </td>
 
                       <td className="px-4 py-3.5">
@@ -510,9 +616,19 @@ export default function ApprovalsPage() {
             )}
 
             {isBulkReject && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-900 flex items-center gap-2 font-medium">
-                <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
-                <span>You are rejecting <strong>{selectedIds.length}</strong> selected documents at once.</span>
+              <div className="space-y-2">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-900 flex items-center gap-2 font-medium">
+                  <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                  <span>You are rejecting <strong>{selectedIds.length}</strong> selected documents at once.</span>
+                </div>
+                <div className="max-h-36 overflow-y-auto divide-y divide-slate-100 bg-slate-50 rounded-lg p-2.5 border border-slate-200 text-xs">
+                  {selectedDocuments.map((doc) => (
+                    <div key={doc.id} className="py-1 flex justify-between items-center">
+                      <span className="font-mono font-bold text-slate-800">{doc.document_number}</span>
+                      <span className="text-[10px] uppercase font-bold text-slate-500">{doc.status}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -555,7 +671,164 @@ export default function ApprovalsPage() {
                   disabled={isSubmitting}
                   className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-sm transition disabled:opacity-50 cursor-pointer"
                 >
-                  {isSubmitting ? 'Rejecting...' : 'Confirm Rejection'}
+                  {isSubmitting ? 'Rejecting...' : `Reject ${isBulkReject ? `${selectedIds.length} Documents` : 'Document'}`}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================================= */}
+      {/* BULK APPROVAL CONFIRMATION MODAL                                        */}
+      {/* ======================================================================= */}
+      {bulkApproveModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-slate-200 animate-in fade-in zoom-in-95">
+            <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                  Approve {selectedIds.length} Documents?
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Confirm bulk approval for the selected documents.
+                </p>
+              </div>
+              <button
+                onClick={() => setBulkApproveModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-xs text-emerald-900 flex items-center gap-2 font-medium">
+              <AlertCircle className="h-4 w-4 text-emerald-600 shrink-0" />
+              <span>You are approving <strong>{selectedIds.length}</strong> documents. Each approved record will generate an authoritative audit entry.</span>
+            </div>
+
+            {/* Document summary list */}
+            <div className="max-h-40 overflow-y-auto divide-y divide-slate-100 bg-slate-50 rounded-lg p-2.5 border border-slate-200 text-xs">
+              {selectedDocuments.map((doc) => (
+                <div key={doc.id} className="py-1 flex justify-between items-center">
+                  <div>
+                    <span className="font-mono font-bold text-blue-700">{doc.document_number}</span>
+                    <span className="text-[10px] text-slate-500 ml-1.5">({doc.document_type.replace(/_/g, ' ')})</span>
+                  </div>
+                  <span className="text-[10px] uppercase font-bold text-amber-600">{doc.status}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setBulkApproveModalOpen(false)}
+                disabled={isSubmitting}
+                className="px-3.5 py-2 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmBulkApprove}
+                disabled={isSubmitting}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition disabled:opacity-50 cursor-pointer"
+              >
+                {isSubmitting ? 'Approving...' : `Approve ${selectedIds.length} Documents`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================================= */}
+      {/* BULK DELETE CONFIRMATION MODAL                                          */}
+      {/* ======================================================================= */}
+      {deleteModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-slate-200 animate-in fade-in zoom-in-95">
+            <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <Trash2 className="h-5 w-5 text-rose-600" />
+                  Delete {selectedIds.length} Documents?
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  A mandatory reason must be recorded in the audit trail for document deletion.
+                </p>
+              </div>
+              <button
+                onClick={() => setDeleteModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="bg-rose-50 border border-rose-200 rounded-lg p-3 text-xs text-rose-900 space-y-1">
+              <div className="font-bold flex items-center gap-1.5">
+                <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                Enterprise Document Lifecycle Enforcement:
+              </div>
+              <p className="text-[11px] leading-relaxed">
+                Pending/Draft records will be physically deleted. Any approved/final records will be safely transitioned to <strong>REVOKED</strong> to preserve audit integrity.
+              </p>
+            </div>
+
+            {/* Document summary list */}
+            <div className="max-h-36 overflow-y-auto divide-y divide-slate-100 bg-slate-50 rounded-lg p-2.5 border border-slate-200 text-xs">
+              {selectedDocuments.map((doc) => (
+                <div key={doc.id} className="py-1 flex justify-between items-center">
+                  <div>
+                    <span className="font-mono font-bold text-slate-800">{doc.document_number}</span>
+                    <span className="text-[10px] text-slate-500 ml-1.5">({doc.document_type.replace(/_/g, ' ')})</span>
+                  </div>
+                  <span className="text-[10px] uppercase font-bold text-slate-600">{doc.status}</span>
+                </div>
+              ))}
+            </div>
+
+            <form onSubmit={handleConfirmDeleteBulk} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                  Reason for deletion <span className="text-rose-600">*</span>
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  value={deleteReason}
+                  onChange={(e) => {
+                    setDeleteReason(e.target.value);
+                    if (deleteError) setDeleteError('');
+                  }}
+                  placeholder="Enter mandatory deletion reason..."
+                  className="w-full p-2.5 border border-slate-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-rose-500"
+                />
+                {deleteError && (
+                  <p className="text-xs text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                    <AlertCircle className="h-3.5 w-3.5" />
+                    {deleteError}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setDeleteModalOpen(false)}
+                  disabled={isSubmitting}
+                  className="px-3.5 py-2 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !deleteReason.trim()}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-sm transition disabled:opacity-50 cursor-pointer"
+                >
+                  {isSubmitting ? 'Deleting...' : `Delete ${selectedIds.length} Documents`}
                 </button>
               </div>
             </form>

@@ -15,8 +15,8 @@ async function runSuperAdminProtectionTests() {
   console.log('================================================================\n');
 
   // Retrieve primary admin user
-  const adminUser = await db.users.getByEmail('admin@varsaka.com');
-  assert(!!adminUser, 'Primary Super Administrator (admin@varsaka.com) exists');
+  const adminUser = await db.users.getByEmail('admin@in.varsaka.com') || await db.users.getByEmail('admin@varsaka.com');
+  assert(!!adminUser, 'Primary Super Administrator (admin@in.varsaka.com) exists');
   assert(adminUser?.role === 'SUPER_ADMIN', 'Primary admin has role SUPER_ADMIN');
 
   const adminId = adminUser!.id;
@@ -175,7 +175,7 @@ async function runSuperAdminProtectionTests() {
   // --------------------------------------------------------------------------
   console.log('\n--- 7. CONTROLLED BREAK-GLASS EMERGENCY RECOVERY ---');
   const recoveredAdmin = await db.users.breakGlassRecover('SecOps-Emergency-Key', 'Drill verification of break-glass mechanism');
-  assert(recoveredAdmin.email === 'admin@varsaka.com', 'Break-glass target resolved to primary Super Administrator');
+  assert(recoveredAdmin.email === 'admin@in.varsaka.com' || recoveredAdmin.email === 'admin@varsaka.com', 'Break-glass target resolved to primary Super Administrator');
   assert(recoveredAdmin.role === 'SUPER_ADMIN', 'Break-glass confirms SUPER_ADMIN role');
   assert(recoveredAdmin.is_active === true, 'Break-glass confirms active account status');
 

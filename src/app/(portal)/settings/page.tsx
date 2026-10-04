@@ -20,6 +20,7 @@ import {
 import { DocumentBrandingSettings } from '@/lib/branding';
 import MfaEnrollmentCard from '@/components/auth/MfaEnrollmentCard';
 import { formatDate } from '@/lib/utils';
+import { LoadingSpinner, InlineLoader } from '@/components/ui/Loading';
 
 export default function SettingsPage() {
   const [branding, setBranding] = useState<DocumentBrandingSettings | null>(null);
@@ -266,7 +267,9 @@ export default function SettingsPage() {
           </div>
 
           {loading ? (
-            <div className="p-8 text-center text-xs text-slate-400">Loading branding configuration...</div>
+            <div className="py-12 flex justify-center">
+              <InlineLoader text="Loading enterprise branding and entity configuration..." size="md" />
+            </div>
           ) : (
             <form onSubmit={handleSaveTextSettings} className="space-y-6">
               
@@ -318,11 +321,13 @@ export default function SettingsPage() {
                     <button
                       type="button"
                       disabled={uploadingSig}
+                      aria-busy={uploadingSig}
+                      aria-disabled={uploadingSig}
                       onClick={() => sigFileInputRef.current?.click()}
                       className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 border border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-bold transition shadow-2xs disabled:opacity-50"
                     >
-                      <Upload className="h-3.5 w-3.5" />
-                      <span>{uploadingSig ? 'Uploading...' : 'Upload / Replace Signature'}</span>
+                      {uploadingSig ? <LoadingSpinner size="xs" variant="primary" /> : <Upload className="h-3.5 w-3.5" />}
+                      <span>{uploadingSig ? 'Uploading Signature...' : 'Upload / Replace Signature'}</span>
                     </button>
                     <span className="text-[10px] text-slate-400 block mt-1 text-center">
                       PNG (transparent preferred) or JPG • Max 2MB
@@ -450,11 +455,13 @@ export default function SettingsPage() {
                     <button
                       type="button"
                       disabled={uploadingStamp}
+                      aria-busy={uploadingStamp}
+                      aria-disabled={uploadingStamp}
                       onClick={() => stampFileInputRef.current?.click()}
                       className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 rounded-lg text-xs font-bold transition shadow-2xs disabled:opacity-50"
                     >
-                      <Upload className="h-3.5 w-3.5" />
-                      <span>{uploadingStamp ? 'Uploading...' : 'Upload / Replace Official Stamp'}</span>
+                      {uploadingStamp ? <LoadingSpinner size="xs" variant="primary" /> : <Upload className="h-3.5 w-3.5" />}
+                      <span>{uploadingStamp ? 'Uploading Official Stamp...' : 'Upload / Replace Official Stamp'}</span>
                     </button>
                     <span className="text-[10px] text-slate-400 block mt-1 text-center">
                       PNG with transparent background preferred • Max 3MB
@@ -509,10 +516,12 @@ export default function SettingsPage() {
                 <button
                   type="submit"
                   disabled={saving}
+                  aria-busy={saving}
+                  aria-disabled={saving}
                   className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition shadow-xs disabled:opacity-50"
                 >
-                  <RefreshCw className={`h-3.5 w-3.5 ${saving ? 'animate-spin' : ''}`} />
-                  <span>{saving ? 'Saving...' : 'Save Branding Metadata'}</span>
+                  {saving ? <LoadingSpinner size="xs" variant="white" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                  <span>{saving ? 'Saving Branding Metadata...' : 'Save Branding Metadata'}</span>
                 </button>
               </div>
 
@@ -797,17 +806,21 @@ export default function SettingsPage() {
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
+                  disabled={savingMeta}
                   onClick={() => setEditMetaModalOpen(false)}
-                  className="px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  className="px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={savingMeta}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold disabled:opacity-50"
+                  aria-busy={savingMeta}
+                  aria-disabled={savingMeta}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold disabled:opacity-50 inline-flex items-center gap-2"
                 >
-                  {savingMeta ? 'Saving Changes...' : 'Save Corporate Metadata'}
+                  {savingMeta && <LoadingSpinner size="xs" variant="white" />}
+                  <span>{savingMeta ? 'Saving Corporate Metadata...' : 'Save Corporate Metadata'}</span>
                 </button>
               </div>
             </form>

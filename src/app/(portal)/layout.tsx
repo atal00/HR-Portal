@@ -1,8 +1,10 @@
 import { redirect } from 'next/navigation';
-import { getCurrentUser } from '@/lib/auth';
+import { cookies } from 'next/headers';
+import { getCurrentUser, LAST_ACTIVITY_COOKIE_NAME, INACTIVITY_TIMEOUT_MS, AUTH_COOKIE } from '@/lib/auth';
 import { Navbar } from '@/components/layout/Navbar';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
+import { InactivityTracker } from '@/components/auth/InactivityTracker';
 import { Toaster } from 'react-hot-toast';
 
 export default async function PortalLayout({
@@ -10,9 +12,24 @@ export default async function PortalLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = await cookies();
+  const lastActivity = cookieStore.get(LAST_ACTIVITY_COOKIE_NAME)?.value;
+  const hasSession = Boolean(cookieStore.get(AUTH_COOKIE.name)?.value);
+
+  // Server-side check: If session exists but inactivity timeout exceeded, fail closed and redirect
+  if (hasSession && lastActivity) {
+    const lastActivityTime = parseInt(lastActivity, 10);
+    if (!isNaN(lastActivityTime) && Date.now() - lastActivityTime > INACTIVITY_TIMEOUT_MS) {
+      redirect('/login?reason=inactivity');
+    }
+  }
+
   const user = await getCurrentUser();
 
   if (!user) {
+    if (hasSession || lastActivity) {
+      redirect('/login?reason=inactivity');
+    }
     redirect('/login');
   }
 
@@ -26,6 +43,7 @@ export default async function PortalLayout({
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans antialiased">
+      <InactivityTracker />
       <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
       <div className="no-print">
         <Navbar user={user} />

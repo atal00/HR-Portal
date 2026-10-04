@@ -87,56 +87,18 @@ export function numberToWordsINR(num: number): string {
   return result + " Only";
 }
 
+import { calculateCompensation, calculateNetInHand, SalaryBreakdownResult, NetInHandCalculationInput, NetInHandCalculationResult } from './compensation';
+export { calculateCompensation, calculateNetInHand };
+export type { SalaryBreakdownResult, NetInHandCalculationInput, NetInHandCalculationResult };
+
 /**
  * Standard Indian CTC Auto-Calculation Formula (Varsaka Labs standard)
+ * Delegated to authoritative calculateCompensation()
  */
-export function calculateSalaryBreakdown(annualCtc: number, variablePay: number = 0) {
-  const fixedAnnual = Math.max(0, annualCtc - variablePay);
-  const monthlyGross = Math.round(fixedAnnual / 12);
-  
-  // Basic: 40% of Gross
-  const basic = Math.round(monthlyGross * 0.40);
-  // HRA: 50% of Basic (20% of Gross)
-  const hra = Math.round(basic * 0.50);
-  
-  // Balanced remainder across allowances (10% each)
-  const remainingAllowance = Math.max(0, monthlyGross - basic - hra);
-  const communicationAllowance = Math.round(remainingAllowance * 0.25);
-  const travelAllowance = Math.round(remainingAllowance * 0.25);
-  const foodAllowance = Math.round(remainingAllowance * 0.25);
-  const otherAllowances = Math.max(0, remainingAllowance - (communicationAllowance * 3));
-
-  // Deductions
-  const employeePf = basic > 15000 ? 1800 : Math.round(basic * 0.12);
-  const employerPf = employeePf;
-  const professionalTax = monthlyGross > 20000 ? 200 : (monthlyGross > 15000 ? 150 : 0);
-  const gratuity = Math.round((basic * 15) / (26 * 12)); // Statutory Gratuity provision
-  const tds = annualCtc > 750000 ? Math.round(((annualCtc - 750000) * 0.10) / 12) : 0;
-
-  const totalDeductions = employeePf + employerPf + professionalTax + gratuity + tds;
-  const netSalary = Math.max(0, monthlyGross - totalDeductions);
-
-  return {
-    annualCtc,
-    variablePay,
-    monthlyGross,
-    basic,
-    hra,
-    communicationAllowance,
-    travelAllowance,
-    foodAllowance,
-    otherAllowances,
-    employeePf,
-    employerPf,
-    professionalTax,
-    gratuity,
-    tds,
-    totalDeductions,
-    netSalary,
-    netSalaryWords: numberToWordsINR(netSalary),
-    annualCtcWords: numberToWordsINR(annualCtc),
-  };
+export function calculateSalaryBreakdown(annualCtc: number, variablePay: number = 0): SalaryBreakdownResult {
+  return calculateCompensation(annualCtc, variablePay);
 }
+
 
 /**
  * Dynamically calculates tenure between joining date and relieving/end date

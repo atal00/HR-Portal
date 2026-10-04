@@ -7,7 +7,14 @@ export const metadata = {
   description: 'Enterprise Sign In with Multi-Factor Authentication',
 };
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ reason?: string; expired?: string }>;
+}) {
+  const params = searchParams ? await searchParams : {};
+  const reason = params?.reason || (params?.expired === 'true' ? 'inactivity' : undefined);
+
   const user = await getCurrentUser();
 
   // If already authenticated:
@@ -24,6 +31,6 @@ export default async function LoginPage() {
     redirect('/dashboard');
   }
 
-  // Not authenticated -> show login form
-  return <LoginClient />;
+  // Not authenticated -> show login form with reason notice if present
+  return <LoginClient initialReason={reason} />;
 }

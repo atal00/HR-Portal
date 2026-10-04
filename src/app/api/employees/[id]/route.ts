@@ -68,7 +68,13 @@ export async function PUT(
     const updated = await db.employees.update(id, employeeData, user.id, user.email);
 
     // If salary information is supplied and user has permission, upsert salary
-    if (salaryData && (hasPermission(user, 'salary.update') || user.role === 'SUPER_ADMIN')) {
+    if (salaryData && (
+      hasPermission(user, 'salary.update') ||
+      hasPermission(user, 'employee.update') ||
+      user.role === 'SUPER_ADMIN' ||
+      user.role === 'HR_ADMIN' ||
+      user.role === 'PAYROLL_ADMIN'
+    )) {
       await db.salary.upsert({
         employee_id: updated.id,
         annual_ctc: Number(salaryData.annual_ctc) || 0,
@@ -143,6 +149,21 @@ export async function DELETE(
       );
     }
 
+    // Verify dependencies and prerequisites before triggering destructive purge
+    const dependencies = await db.employees.getDeletionDependencies(id);
+    if (!dependencies.canPurge) {
+      const status = dependencies.tasksTableAvailable === false ? 503 : 400;
+      return NextResponse.json(
+        {
+          error: dependencies.blockingReason || 'Employee cannot be purged due to dependency or retention constraints.',
+          canPurge: false,
+          tasksTableAvailable: dependencies.tasksTableAvailable,
+          retainedDocumentsCount: dependencies.retainedDocumentsCount,
+        },
+        { status }
+      );
+    }
+
     const result = await db.employees.permanentPurge(id, user.id, user.email);
 
     await logSecurityEvent({
@@ -158,6 +179,19 @@ export async function DELETE(
       purgedId: result.purgedId,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    const msg = error.message || 'Failed to purge employee record.';
+    let status = 400;
+    if (msg.includes('Forbidden') || msg.includes('SECURITY VIOLATION')) {
+      status = 403;
+    } else if (msg.includes('temporarily unavailable') || msg.toLowerCase().includes('tasks')) {
+      status = 503;
+    } else if (msg.includes('not found')) {
+      status = 404;
+    }
+    return NextResponse.json({
+      error: msg,
+      canPurge: false,
+      tasksTableAvailable: msg.toLowerCase().includes('tasks') ? false : undefined,
+    }, { status });
   }
 }

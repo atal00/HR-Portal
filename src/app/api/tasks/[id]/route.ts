@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { hasPermission } from '@/lib/rbac';
 import { logAuditEvent, logSecurityEvent } from '@/lib/audit';
 import { TaskPriority, TaskStatus } from '@/types/database';
+import { formatSafeApiError } from '@/lib/errors';
 
 export async function GET(
   req: NextRequest,
@@ -19,18 +20,26 @@ export async function GET(
     }
 
     // RBAC: Super Admin, HR Admin, assignee, or creator can view
+    // P5 remediation: return 404 to avoid revealing task existence to unauthorized callers
     const isPrivileged = user.role === 'SUPER_ADMIN' || user.role === 'HR_ADMIN';
     const isParty = task.assigned_to === user.id || task.created_by === user.id;
 
     if (!isPrivileged && !isParty) {
-      return NextResponse.json({ error: 'Forbidden: You do not have access to this task.' }, { status: 403 });
+      await logSecurityEvent({
+        eventType: 'UNAUTHORIZED_ACCESS',
+        severity: 'MEDIUM',
+        description: `User ${user.email} (${user.role}) denied direct access to task ${id}`,
+        userId: user.id,
+      });
+      return NextResponse.json({ error: 'Task not found.' }, { status: 404 });
     }
 
     return NextResponse.json({ success: true, task });
   } catch (error: any) {
+    const { error: safeError, status } = formatSafeApiError(error);
     return NextResponse.json(
-      { error: error.message || 'Internal Server Error' },
-      { status: error.status || 500 }
+      { error: safeError },
+      { status }
     );
   }
 }
@@ -54,6 +63,7 @@ export async function PATCH(
     const isCreator = task.created_by === user.id;
 
     // Must be either privileged, assignee, or creator
+    // P5 remediation: return 404 to avoid revealing task existence to unauthorized callers
     if (!isSuperAdmin && !isHrAdmin && !isAssignee && !isCreator) {
       await logSecurityEvent({
         eventType: 'UNAUTHORIZED_ACCESS',
@@ -61,7 +71,7 @@ export async function PATCH(
         description: `User ${user.email} attempted to update task ${id} without permission.`,
         userId: user.id,
       });
-      return NextResponse.json({ error: 'Forbidden: You do not have permission to update this task.' }, { status: 403 });
+      return NextResponse.json({ error: 'Task not found.' }, { status: 404 });
     }
 
     const body = await req.json();
@@ -184,9 +194,10 @@ export async function PATCH(
       task: updatedTask,
     });
   } catch (error: any) {
+    const { error: safeError, status } = formatSafeApiError(error);
     return NextResponse.json(
-      { error: error.message || 'Internal Server Error' },
-      { status: error.status || 500 }
+      { error: safeError },
+      { status }
     );
   }
 }

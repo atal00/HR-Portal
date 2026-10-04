@@ -7,7 +7,7 @@ import {
   markChallengeNonceConsumed,
   MFA_CHALLENGE_COOKIE,
 } from '@/lib/mfa';
-import { signSessionPayload, AUTH_COOKIE } from '@/lib/auth';
+import { signSessionPayload, AUTH_COOKIE, LAST_ACTIVITY_COOKIE } from '@/lib/auth';
 import { logAuditEvent, logSecurityEvent } from '@/lib/audit';
 
 export async function POST(req: NextRequest) {
@@ -245,6 +245,12 @@ export async function POST(req: NextRequest) {
       name: AUTH_COOKIE.name,
       value: sessionToken,
       ...AUTH_COOKIE.options,
+    });
+
+    res.cookies.set({
+      name: LAST_ACTIVITY_COOKIE.name,
+      value: Date.now().toString(),
+      ...LAST_ACTIVITY_COOKIE.options,
     });
 
     res.cookies.set({

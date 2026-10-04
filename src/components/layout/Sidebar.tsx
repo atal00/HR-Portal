@@ -186,7 +186,7 @@ export const Sidebar: React.FC<Props> = ({ user }) => {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition group ${
+                  className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition cursor-pointer group ${
                     item.indent ? 'ml-3 pl-3 py-1.5 text-[11.5px] border-l border-slate-200' : ''
                   } ${
                     isActive
@@ -225,7 +225,7 @@ export const Sidebar: React.FC<Props> = ({ user }) => {
               <button
                 type="button"
                 onClick={() => setAdminOpen(!adminOpen)}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 transition group"
+                className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 transition group cursor-pointer"
               >
                 <div className="flex items-center gap-2.5">
                   <Shield className="h-4 w-4 text-slate-500 group-hover:text-slate-800" />
@@ -248,7 +248,7 @@ export const Sidebar: React.FC<Props> = ({ user }) => {
                       <Link
                         key={item.href}
                         href={item.href}
-                        className={`flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                        className={`flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
                           isActive
                             ? 'bg-blue-600 text-white font-semibold shadow-xs'
                             : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'

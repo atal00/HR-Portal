@@ -37,6 +37,7 @@ export type PermissionCode =
   | 'document.approve'
   | 'document.reject'
   | 'document.revoke'
+  | 'document.delete'
   | 'template.create'
   | 'template.update'
   | 'template.publish'

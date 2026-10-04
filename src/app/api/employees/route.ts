@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuthUser } from '@/lib/auth';
 import { hasPermission } from '@/lib/rbac';
-import { logAuditEvent, logSecurityEvent } from '@/lib/audit';
+import { logSecurityEvent } from '@/lib/audit';
 import { z } from 'zod';
 
 const createEmployeeSchema = z.object({
@@ -64,15 +64,22 @@ const createEmployeeSchema = z.object({
     hra: z.number().optional(),
     special_allowance: z.number().optional(),
     conveyance: z.number().optional(),
+    communication_allowance: z.number().optional(),
+    travel_allowance: z.number().optional(),
+    food_allowance: z.number().optional(),
     other_allowances: z.number().optional(),
     employee_pf: z.number().optional(),
     employer_pf: z.number().optional(),
     professional_tax: z.number().optional(),
+    gratuity: z.number().optional(),
     tds: z.number().optional(),
     esic: z.number().optional(),
     other_deductions: z.number().optional(),
+    variable_pay: z.number().optional(),
     net_salary: z.number().optional(),
+    effective_date: z.string().optional(),
   }).optional(),
+
 
   // Section E - Document / KYC References
   kyc_documents: z.record(z.string(), z.string()).optional(),
@@ -159,32 +166,38 @@ export async function POST(req: NextRequest) {
       user.email
     );
 
-    // If salary information is supplied and user has payroll permission, upsert salary
-    if (salaryData && (salaryData.annual_ctc || salaryData.basic)) {
-      const canManageSalary = hasPermission(user, 'salary.update') || user.role === 'SUPER_ADMIN';
+    // If salary information is supplied and user is authorized, upsert salary
+    if (salaryData && (salaryData.annual_ctc !== undefined || salaryData.basic !== undefined || salaryData.monthly_gross !== undefined)) {
+      const canManageSalary =
+        hasPermission(user, 'salary.update') ||
+        hasPermission(user, 'employee.create') ||
+        user.role === 'SUPER_ADMIN' ||
+        user.role === 'HR_ADMIN' ||
+        user.role === 'PAYROLL_ADMIN';
+
       if (canManageSalary) {
         await db.salary.upsert({
           employee_id: newEmp.id,
-          annual_ctc: salaryData.annual_ctc || 0,
-          monthly_gross: salaryData.monthly_gross || 0,
-          basic: salaryData.basic || 0,
-          hra: salaryData.hra || 0,
-          special_allowance: salaryData.special_allowance || 0,
-          conveyance: salaryData.conveyance || 0,
-          communication_allowance: 0,
-          travel_allowance: 0,
-          food_allowance: 0,
-          other_allowances: salaryData.other_allowances || 0,
-          employee_pf: salaryData.employee_pf || 0,
-          employer_pf: salaryData.employer_pf || 0,
-          professional_tax: salaryData.professional_tax || 0,
-          gratuity: 0,
-          tds: salaryData.tds || 0,
-          esic: salaryData.esic || 0,
-          other_deductions: salaryData.other_deductions || 0,
-          variable_pay: 0,
-          net_salary: salaryData.net_salary || 0,
-          effective_date: newEmp.joining_date || new Date().toISOString().split('T')[0],
+          annual_ctc: Number(salaryData.annual_ctc) || 0,
+          monthly_gross: Number(salaryData.monthly_gross) || 0,
+          basic: Number(salaryData.basic) || 0,
+          hra: Number(salaryData.hra) || 0,
+          special_allowance: Number(salaryData.special_allowance) || 0,
+          conveyance: Number(salaryData.conveyance) || 0,
+          communication_allowance: Number(salaryData.communication_allowance) || 0,
+          travel_allowance: Number(salaryData.travel_allowance) || 0,
+          food_allowance: Number(salaryData.food_allowance) || 0,
+          other_allowances: Number(salaryData.other_allowances) || 0,
+          employee_pf: Number(salaryData.employee_pf) || 0,
+          employer_pf: Number(salaryData.employer_pf) || 0,
+          professional_tax: Number(salaryData.professional_tax) || 0,
+          gratuity: Number(salaryData.gratuity) || 0,
+          tds: Number(salaryData.tds) || 0,
+          esic: Number(salaryData.esic) || 0,
+          other_deductions: Number(salaryData.other_deductions) || 0,
+          variable_pay: Number(salaryData.variable_pay) || 0,
+          net_salary: Number(salaryData.net_salary) || 0,
+          effective_date: salaryData.effective_date || newEmp.joining_date || new Date().toISOString().split('T')[0],
         }, user.id, user.email);
       }
     }

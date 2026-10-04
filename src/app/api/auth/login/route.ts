@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { signSessionPayload, AUTH_COOKIE } from '@/lib/auth';
+import { signSessionPayload, AUTH_COOKIE, LAST_ACTIVITY_COOKIE } from '@/lib/auth';
 import { signMfaChallenge, verifyMfaChallenge, MFA_CHALLENGE_COOKIE } from '@/lib/mfa';
 import { logAuditEvent, logSecurityEvent } from '@/lib/audit';
-import { rateLimiter } from '@/lib/rate-limit';
+import { loginTokenBucket } from '@/lib/rate-limit';
 import { verifyPassword } from '@/lib/password';
 
 const GENERIC_AUTH_ERROR = 'Invalid credentials or inactive account.';
@@ -11,24 +11,24 @@ const GENERIC_AUTH_ERROR = 'Invalid credentials or inactive account.';
 export async function POST(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || '127.0.0.1';
   const userAgent = req.headers.get('user-agent') || 'Browser';
-  const rateLimitKey = `login_fail:${ip}`;
+  const ipBucketKey = `login:ip:${ip}`;
 
   try {
-    // 1. Check IP rate limit (max 5 failed attempts in 5 minutes)
-    const lockout = rateLimiter.isBlocked(rateLimitKey, 5, 5 * 60 * 1000);
-    if (lockout.blocked) {
+    // 1. Check IP token bucket (5 tokens capacity, 1 token/15min refill)
+    const ipLock = loginTokenBucket.check(ipBucketKey);
+    if (!ipLock.allowed) {
       await logSecurityEvent({
         eventType: 'RATE_LIMIT_EXCEEDED',
         severity: 'HIGH',
-        description: `Brute force lockout triggered on login from IP ${ip}`,
+        description: `Brute force lockout triggered on login from IP ${ip}. Time until token refill: ${ipLock.lockoutSeconds}s`,
         ipAddress: ip,
         userAgent,
       });
       return NextResponse.json(
-        { error: `Too many failed login attempts. Account locked. Please try again in ${lockout.lockoutSeconds} seconds.` },
+        { error: `Too many failed login attempts from this network. Please try again in ${ipLock.lockoutSeconds} seconds.` },
         { 
           status: 429,
-          headers: { 'Retry-After': String(lockout.lockoutSeconds) }
+          headers: { 'Retry-After': String(ipLock.lockoutSeconds) }
         }
       );
     }
@@ -46,15 +46,37 @@ export async function POST(req: NextRequest) {
     }
 
     const email = rawEmail.trim().toLowerCase();
+    const accountBucketKey = `login:account:${email}`;
+
+    // 1b. Check Account token bucket (5 tokens capacity, 1 token/15min refill)
+    const accountLock = loginTokenBucket.check(accountBucketKey);
+    if (!accountLock.allowed) {
+      await logSecurityEvent({
+        eventType: 'RATE_LIMIT_EXCEEDED',
+        severity: 'HIGH',
+        description: `Account lockout triggered for ${email} from IP ${ip}. Time until token refill: ${accountLock.lockoutSeconds}s`,
+        ipAddress: ip,
+        userAgent,
+        metadata: { target_email: email },
+      });
+      return NextResponse.json(
+        { error: `Too many failed login attempts for this account. Account locked. Please try again in ${accountLock.lockoutSeconds} seconds.` },
+        { 
+          status: 429,
+          headers: { 'Retry-After': String(accountLock.lockoutSeconds) }
+        }
+      );
+    }
 
     // Step 2: Find user in public.users
     const user = await db.users.getByEmail(email);
     if (!user) {
-      const failStatus = rateLimiter.recordFailure(rateLimitKey, 5, 5 * 60 * 1000);
+      const failAccount = loginTokenBucket.consume(accountBucketKey);
+      const failIp = loginTokenBucket.consume(ipBucketKey);
       await logSecurityEvent({
         eventType: 'AUTH_FAILURE',
-        severity: failStatus.isLocked ? 'HIGH' : 'MEDIUM',
-        description: `LOGIN_FAILURE: USER_NOT_FOUND for ${email}. Remaining IP attempts: ${failStatus.remainingAttempts}`,
+        severity: (failAccount.isLocked || failIp.isLocked) ? 'HIGH' : 'MEDIUM',
+        description: `LOGIN_FAILURE: USER_NOT_FOUND for ${email}. Remaining account tokens: ${failAccount.remainingTokens}, IP tokens: ${failIp.remainingTokens}`,
         ipAddress: ip,
         userAgent,
         metadata: { reason_category: 'USER_NOT_FOUND', target_email: email },
@@ -65,10 +87,11 @@ export async function POST(req: NextRequest) {
 
     // Step 3: Check user.is_active === true
     if (!user.is_active) {
-      const failStatus = rateLimiter.recordFailure(rateLimitKey, 5, 5 * 60 * 1000);
+      const failAccount = loginTokenBucket.consume(accountBucketKey);
+      const failIp = loginTokenBucket.consume(ipBucketKey);
       await logSecurityEvent({
         eventType: 'AUTH_FAILURE',
-        severity: failStatus.isLocked ? 'HIGH' : 'MEDIUM',
+        severity: (failAccount.isLocked || failIp.isLocked) ? 'HIGH' : 'MEDIUM',
         description: `LOGIN_FAILURE: ACCOUNT_INACTIVE for user ${user.id} (${email})`,
         userId: user.id,
         ipAddress: ip,
@@ -82,10 +105,11 @@ export async function POST(req: NextRequest) {
     // Step 4: Load public.user_credentials for that user
     const cred = await db.userCredentials.getByUserId(user.id);
     if (!cred || !cred.password_hash) {
-      const failStatus = rateLimiter.recordFailure(rateLimitKey, 5, 5 * 60 * 1000);
+      const failAccount = loginTokenBucket.consume(accountBucketKey);
+      const failIp = loginTokenBucket.consume(ipBucketKey);
       await logSecurityEvent({
         eventType: 'AUTH_FAILURE',
-        severity: failStatus.isLocked ? 'HIGH' : 'MEDIUM',
+        severity: (failAccount.isLocked || failIp.isLocked) ? 'HIGH' : 'MEDIUM',
         description: `LOGIN_FAILURE: CREDENTIAL_NOT_FOUND for user ${user.id} (${email})`,
         userId: user.id,
         ipAddress: ip,
@@ -171,13 +195,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (!isPasswordValid) {
-      rateLimiter.recordFailure(rateLimitKey, 5, 5 * 60 * 1000);
+      const failAccount = loginTokenBucket.consume(accountBucketKey);
+      const failIp = loginTokenBucket.consume(ipBucketKey);
       const userLockStatus = await db.userCredentials.recordFailedAttempt(user.id, 5, 15);
 
       await logSecurityEvent({
         eventType: 'AUTH_FAILURE',
-        severity: userLockStatus.isLocked ? 'HIGH' : 'MEDIUM',
-        description: `LOGIN_FAILURE: INVALID_PASSWORD for account: ${email}. User remaining attempts: ${userLockStatus.remainingAttempts}`,
+        severity: (userLockStatus.isLocked || failAccount.isLocked || failIp.isLocked) ? 'HIGH' : 'MEDIUM',
+        description: `LOGIN_FAILURE: INVALID_PASSWORD for account: ${email}. Account tokens: ${failAccount.remainingTokens}, IP tokens: ${failIp.remainingTokens}, User remaining attempts: ${userLockStatus.remainingAttempts}`,
         userId: user.id,
         ipAddress: ip,
         userAgent,
@@ -185,16 +210,23 @@ export async function POST(req: NextRequest) {
           reason_category: 'INVALID_PASSWORD', 
           user_id: user.id, 
           remaining_attempts: userLockStatus.remainingAttempts,
-          is_locked: userLockStatus.isLocked 
+          account_tokens: failAccount.remainingTokens,
+          ip_tokens: failIp.remainingTokens,
+          is_locked: userLockStatus.isLocked || failAccount.isLocked || failIp.isLocked,
         },
       });
 
-      if (userLockStatus.isLocked) {
+      if (failAccount.isLocked || failIp.isLocked || userLockStatus.isLocked) {
+        const lockSeconds = Math.max(
+          failAccount.lockoutSeconds || 0,
+          failIp.lockoutSeconds || 0,
+          userLockStatus.lockoutSeconds || 0
+        ) || 900;
         return NextResponse.json(
-          { error: `Too many failed login attempts. Account locked. Please try again in ${userLockStatus.lockoutSeconds} seconds.` },
+          { error: `Too many failed login attempts. Account locked. Please try again in ${lockSeconds} seconds.` },
           { 
-            status: 423,
-            headers: { 'Retry-After': String(userLockStatus.lockoutSeconds) }
+            status: 429,
+            headers: { 'Retry-After': String(lockSeconds) }
           }
         );
       }
@@ -218,7 +250,8 @@ export async function POST(req: NextRequest) {
 
     // Step 7: Resolve permissions server-side (user.permissions already resolved by db.users.getByEmail)
     // Step 8: Reset password-level failed attempts on password success
-    rateLimiter.reset(rateLimitKey);
+    loginTokenBucket.reset(accountBucketKey);
+    loginTokenBucket.reset(ipBucketKey);
     await db.userCredentials.resetFailedAttempts(user.id);
 
     // Step 8.5: Authoritative MFA State Check (Fail-Closed)
@@ -349,6 +382,11 @@ export async function POST(req: NextRequest) {
         value: sessionToken,
         ...AUTH_COOKIE.options,
       });
+      res.cookies.set({
+        name: LAST_ACTIVITY_COOKIE.name,
+        value: Date.now().toString(),
+        ...LAST_ACTIVITY_COOKIE.options,
+      });
 
       return res;
     }
@@ -396,6 +434,11 @@ export async function POST(req: NextRequest) {
       name: AUTH_COOKIE.name,
       value: sessionToken,
       ...AUTH_COOKIE.options,
+    });
+    res.cookies.set({
+      name: LAST_ACTIVITY_COOKIE.name,
+      value: Date.now().toString(),
+      ...LAST_ACTIVITY_COOKIE.options,
     });
 
     return res;

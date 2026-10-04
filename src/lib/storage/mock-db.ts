@@ -546,12 +546,18 @@ class LocalDatabase {
 
   // Atomic Sequence Generation
   public getNextDocumentNumber(type: DocumentType): string {
-    if (!this.state.sequences[type]) {
-      this.state.sequences[type] = 1001;
-    }
-    const currentSeq = this.state.sequences[type]++;
+    const existingSeqs = (this.state.documents || [])
+      .filter((d) => d.document_type === type)
+      .map((d) => {
+        const match = (d.document_number || '').match(/-(\d+)$/);
+        return match ? parseInt(match[1], 10) : 0;
+      });
+    const maxExisting = Math.max(1000, ...existingSeqs);
+    const storedSeq = this.state.sequences[type] || 1001;
+    const nextSeq = Math.max(storedSeq, maxExisting + 1);
+    this.state.sequences[type] = nextSeq + 1;
     this.save();
-    return formatDocumentNumber(type, currentSeq);
+    return formatDocumentNumber(type, nextSeq);
   }
 }
 

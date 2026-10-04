@@ -13,9 +13,9 @@ import {
   Edit2,
   Building2,
   Mail,
-  Phone,
-  Briefcase
+  X
 } from 'lucide-react';
+import { TableSkeleton } from '@/components/ui/Loading';
 
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -23,12 +23,13 @@ export default function EmployeesPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
-  const fetchEmployees = async () => {
+  const fetchEmployees = async (queryTerm = search, currentStatus = statusFilter) => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (search) params.set('search', search);
-      if (statusFilter !== 'ALL') params.set('status', statusFilter);
+      const trimmed = queryTerm.trim();
+      if (trimmed) params.set('search', trimmed);
+      if (currentStatus !== 'ALL') params.set('status', currentStatus);
 
       const res = await fetch(`/api/employees?${params.toString()}`);
       if (res.ok) {
@@ -42,13 +43,22 @@ export default function EmployeesPage() {
     }
   };
 
+  // Fully reactive search: immediate (0ms) when empty/cleared, debounced (180ms) when typing
   useEffect(() => {
-    fetchEmployees();
-  }, [statusFilter]);
+    const delay = search === '' ? 0 : 180;
+    const timer = setTimeout(() => {
+      fetchEmployees(search, statusFilter);
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [search, statusFilter]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    fetchEmployees();
+    fetchEmployees(search, statusFilter);
+  };
+
+  const handleClearSearch = () => {
+    setSearch('');
   };
 
   const getStatusBadge = (status: EmployeeStatus) => {
@@ -101,8 +111,18 @@ export default function EmployeesPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name, ID (e.g. VL 1083), email..."
-            className="w-full pl-9 pr-4 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none"
+            className="w-full pl-9 pr-8 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none"
           />
+          {search && (
+            <button
+              type="button"
+              onClick={handleClearSearch}
+              className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 transition"
+              title="Clear search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </form>
 
         <div className="flex items-center gap-2 w-full md:w-auto">
@@ -125,13 +145,14 @@ export default function EmployeesPage() {
       </div>
 
       {/* Employees Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-        {loading ? (
-          <div className="p-12 text-center text-xs text-slate-500">Loading employee directory...</div>
-        ) : employees.length === 0 ? (
-          <div className="p-12 text-center text-xs text-slate-500">No employees found matching criteria.</div>
-        ) : (
-          <div className="overflow-x-auto">
+      {loading ? (
+        <TableSkeleton rows={8} columns={6} />
+      ) : (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+          {employees.length === 0 ? (
+            <div className="p-12 text-center text-xs text-slate-500">No employees found matching criteria.</div>
+          ) : (
+            <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
                 <tr>
@@ -205,6 +226,7 @@ export default function EmployeesPage() {
           </div>
         )}
       </div>
+      )}
 
     </div>
   );

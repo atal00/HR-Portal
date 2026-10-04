@@ -1,11 +1,17 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { SessionUser } from '@/types/auth';
 import { ROLE_LABELS } from '@/lib/rbac';
 import { LogOut, ShieldCheck, ExternalLink } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/Loading';
+import {
+  LAST_ACTIVITY_COOKIE_NAME,
+  AUTH_CHANNEL_NAME,
+  LOGOUT_SIGNAL_KEY,
+} from '@/lib/inactivity-constants';
 
 interface Props {
   user: SessionUser;
@@ -13,11 +19,28 @@ interface Props {
 
 export const Navbar: React.FC<Props> = ({ user }) => {
   const router = useRouter();
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    router.push('/login');
-    router.refresh();
+    setLoggingOut(true);
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(LAST_ACTIVITY_COOKIE_NAME);
+        localStorage.setItem(LOGOUT_SIGNAL_KEY, String(Date.now()));
+        document.cookie = `${LAST_ACTIVITY_COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax;`;
+        if ('BroadcastChannel' in window) {
+          const channel = new BroadcastChannel(AUTH_CHANNEL_NAME);
+          channel.postMessage({ type: 'LOGOUT', reason: 'manual' });
+          channel.close();
+        }
+      }
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // Ignore storage/channel errors on manual logout
+    } finally {
+      router.push('/login');
+      router.refresh();
+    }
   };
 
   const roleInfo = ROLE_LABELS[user.role] || { name: user.role, badgeColor: 'bg-slate-100 text-slate-800 border-slate-200' };
@@ -26,7 +49,7 @@ export const Navbar: React.FC<Props> = ({ user }) => {
     <header className="h-16 border-b border-slate-200/90 bg-white/95 backdrop-blur-md sticky top-0 z-30 flex items-center justify-between px-4 sm:px-6 shadow-xs">
       {/* Brand / Logo */}
       <div className="flex items-center gap-3">
-        <Link href="/dashboard" className="flex items-center gap-3 group">
+        <Link href="/dashboard" className="flex items-center gap-3 group cursor-pointer">
           <div className="relative h-9 w-9 shrink-0 flex items-center justify-center rounded-lg bg-slate-50 border border-slate-200/60 p-1 overflow-hidden">
             <img 
               src="/brand/varsaka-logo.png" 
@@ -55,7 +78,7 @@ export const Navbar: React.FC<Props> = ({ user }) => {
         <Link 
           href="/verify" 
           target="_blank" 
-          className="font-mono text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 font-semibold"
+          className="font-mono text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 font-semibold cursor-pointer"
         >
           /verify
           <ExternalLink className="h-3 w-3" />
@@ -78,10 +101,13 @@ export const Navbar: React.FC<Props> = ({ user }) => {
         {/* Logout */}
         <button
           onClick={handleLogout}
-          className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
+          disabled={loggingOut}
+          aria-busy={loggingOut}
+          aria-disabled={loggingOut}
+          className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer disabled:opacity-50"
           title="Sign out of portal"
         >
-          <LogOut className="h-4 w-4" />
+          {loggingOut ? <LoadingSpinner size="xs" variant="slate" /> : <LogOut className="h-4 w-4" />}
         </button>
       </div>
     </header>

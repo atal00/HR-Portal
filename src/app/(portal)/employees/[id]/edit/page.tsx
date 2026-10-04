@@ -15,8 +15,14 @@ import {
   FolderOpen,
   Edit3,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Sparkles,
+  Calculator
 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
+import { formatCurrency } from '@/lib/utils';
+import { calculateCompensation, calculateNetInHand } from '@/lib/compensation';
+import { PageLoader, LoadingSpinner } from '@/components/ui/Loading';
 
 export default function EditEmployeePage() {
   const router = useRouter();
@@ -32,6 +38,7 @@ export default function EditEmployeePage() {
   const [originalEmpId, setOriginalEmpId] = useState('');
   const [showIdConfirmModal, setShowIdConfirmModal] = useState(false);
   const [isEditingId, setIsEditingId] = useState(false);
+  const [hasExistingSalary, setHasExistingSalary] = useState(false);
 
   const [formData, setFormData] = useState<Partial<Employee> & { salary?: Partial<EmployeeSalary> }>({
     employee_id: '',
@@ -77,10 +84,11 @@ export default function EditEmployeePage() {
     bank_account_holder_name: '',
     bank_account_number: '',
     bank_ifsc: '',
-    salary_structure: '',
+    salary_structure: 'Standard Annual CTC',
 
     salary: {
       annual_ctc: 0,
+      variable_pay: 0,
       monthly_gross: 0,
       basic: 0,
       hra: 0,
@@ -90,10 +98,12 @@ export default function EditEmployeePage() {
       employee_pf: 0,
       employer_pf: 0,
       professional_tax: 0,
+      gratuity: 0,
       tds: 0,
       esic: 0,
       other_deductions: 0,
       net_salary: 0,
+      effective_date: '',
     },
 
     kyc_documents: {},
@@ -115,9 +125,12 @@ export default function EditEmployeePage() {
             const salRes = await fetch(`/api/salary/${id}`);
             if (salRes.ok) {
               salaryData = await salRes.json();
+              setHasExistingSalary(true);
+            } else {
+              setHasExistingSalary(false);
             }
           } catch {
-            // Non-fatal if salary access is restricted
+            setHasExistingSalary(false);
           }
 
           setFormData({
@@ -166,22 +179,25 @@ export default function EditEmployeePage() {
             bank_ifsc: data.bank_ifsc || '',
             salary_structure: data.salary_structure || 'Standard Annual CTC',
 
-            salary: salaryData ? {
-              annual_ctc: Number(salaryData.annual_ctc) || 0,
-              monthly_gross: Number(salaryData.monthly_gross) || 0,
-              basic: Number(salaryData.basic) || 0,
-              hra: Number(salaryData.hra) || 0,
-              special_allowance: Number(salaryData.special_allowance) || 0,
-              conveyance: Number(salaryData.conveyance) || 0,
-              other_allowances: Number(salaryData.other_allowances) || 0,
-              employee_pf: Number(salaryData.employee_pf) || 0,
-              employer_pf: Number(salaryData.employer_pf) || 0,
-              professional_tax: Number(salaryData.professional_tax) || 0,
-              tds: Number(salaryData.tds) || 0,
-              esic: Number(salaryData.esic) || 0,
-              other_deductions: Number(salaryData.other_deductions) || 0,
-              net_salary: Number(salaryData.net_salary) || 0,
-            } : undefined,
+            salary: {
+              annual_ctc: salaryData ? Number(salaryData.annual_ctc) || 0 : 0,
+              variable_pay: salaryData ? Number(salaryData.variable_pay) || 0 : 0,
+              monthly_gross: salaryData ? Number(salaryData.monthly_gross) || 0 : 0,
+              basic: salaryData ? Number(salaryData.basic) || 0 : 0,
+              hra: salaryData ? Number(salaryData.hra) || 0 : 0,
+              special_allowance: salaryData ? Number(salaryData.special_allowance) || 0 : 0,
+              conveyance: salaryData ? Number(salaryData.conveyance) || 0 : 0,
+              other_allowances: salaryData ? Number(salaryData.other_allowances) || 0 : 0,
+              employee_pf: salaryData ? Number(salaryData.employee_pf) || 0 : 0,
+              employer_pf: salaryData ? Number(salaryData.employer_pf) || 0 : 0,
+              professional_tax: salaryData ? Number(salaryData.professional_tax) || 0 : 0,
+              gratuity: salaryData ? Number(salaryData.gratuity) || 0 : 0,
+              tds: salaryData ? Number(salaryData.tds) || 0 : 0,
+              esic: salaryData ? Number(salaryData.esic) || 0 : 0,
+              other_deductions: salaryData ? Number(salaryData.other_deductions) || 0 : 0,
+              net_salary: salaryData ? Number(salaryData.net_salary) || 0 : 0,
+              effective_date: salaryData?.effective_date ? salaryData.effective_date.split('T')[0] : (data.joining_date ? data.joining_date.split('T')[0] : ''),
+            },
 
             kyc_documents: data.kyc_documents || {},
           });
@@ -194,6 +210,69 @@ export default function EditEmployeePage() {
     }
     if (id) loadEmp();
   }, [id]);
+
+  // Auto-Calculate Breakdown from Annual CTC & Variable Pay
+  const handleRecalculateSalary = () => {
+    if (!formData.salary) return;
+    const ctc = Number(formData.salary.annual_ctc) || 0;
+    const variable = Number(formData.salary.variable_pay) || 0;
+    const b = calculateCompensation(ctc, variable);
+    setFormData((prev) => ({
+      ...prev,
+      salary: {
+        ...prev.salary,
+        annual_ctc: ctc,
+        variable_pay: variable,
+        monthly_gross: b.monthlyGross,
+        basic: b.basic,
+        hra: b.hra,
+        employee_pf: b.employeePf,
+        employer_pf: b.employerPf,
+        professional_tax: b.professionalTax,
+        gratuity: b.gratuity,
+        tds: b.tds,
+        net_salary: b.netSalary,
+        special_allowance: Math.max(0, b.monthlyGross - (b.basic + b.hra + 1600)),
+        conveyance: 1600,
+        other_allowances: b.otherAllowances,
+      },
+    }));
+    toast.success('Salary component breakdown auto-calculated.');
+  };
+
+  // Live recalculate Net In-Hand from current values
+  const handleCalculateInHand = () => {
+    if (!formData.salary) return;
+    const gross = Number(formData.salary.monthly_gross) || 0;
+    const empPf = Number(formData.salary.employee_pf) || 0;
+    const emplyrPf = Number(formData.salary.employer_pf) || 0;
+    const pt = Number(formData.salary.professional_tax) || 0;
+    const b = Number(formData.salary.basic) || 0;
+    const gratuity = Number(formData.salary.gratuity) || Math.round((b * 15) / (26 * 12));
+    const tdsVal = Number(formData.salary.tds) || 0;
+    const esicVal = Number(formData.salary.esic) || 0;
+    const otherDedVal = Number(formData.salary.other_deductions) || 0;
+
+    const res = calculateNetInHand({
+      monthlyGross: gross,
+      employeePf: empPf,
+      employerPf: emplyrPf,
+      professionalTax: pt,
+      gratuity,
+      tds: tdsVal,
+      esic: esicVal,
+      otherDeductions: otherDedVal,
+    });
+
+    setFormData((prev) => ({
+      ...prev,
+      salary: {
+        ...prev.salary,
+        net_salary: res.netSalary,
+      },
+    }));
+    toast.success(`Net In-Hand recalculated: ${formatCurrency(res.netSalary)}`);
+  };
 
   const handlePreSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -232,10 +311,34 @@ export default function EditEmployeePage() {
     }
 
     try {
+      const finalPayload = {
+        ...formData,
+        salary: formData.salary ? {
+          ...formData.salary,
+          annual_ctc: Number(formData.salary.annual_ctc) || 0,
+          variable_pay: Number(formData.salary.variable_pay) || 0,
+          monthly_gross: Number(formData.salary.monthly_gross) || 0,
+          basic: Number(formData.salary.basic) || 0,
+          hra: Number(formData.salary.hra) || 0,
+          special_allowance: Number(formData.salary.special_allowance) || 0,
+          conveyance: Number(formData.salary.conveyance) || 0,
+          other_allowances: Number(formData.salary.other_allowances) || 0,
+          employee_pf: Number(formData.salary.employee_pf) || 0,
+          employer_pf: Number(formData.salary.employer_pf) || 0,
+          professional_tax: Number(formData.salary.professional_tax) || 0,
+          gratuity: Number(formData.salary.gratuity) || 0,
+          tds: Number(formData.salary.tds) || 0,
+          esic: Number(formData.salary.esic) || 0,
+          other_deductions: Number(formData.salary.other_deductions) || 0,
+          net_salary: Number(formData.salary.net_salary) || 0,
+          effective_date: formData.salary.effective_date || formData.joining_date || undefined,
+        } : undefined,
+      };
+
       const res = await fetch(`/api/employees/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(finalPayload),
       });
 
       if (!res.ok) {
@@ -243,6 +346,7 @@ export default function EditEmployeePage() {
         throw new Error(data.error || 'Failed to update employee master record.');
       }
 
+      toast.success('Employee master record and compensation saved successfully.');
       router.push(`/employees/${id}`);
       router.refresh();
     } catch (err: any) {
@@ -253,7 +357,12 @@ export default function EditEmployeePage() {
   };
 
   if (loading) {
-    return <div className="p-12 text-center text-xs text-slate-500">Loading complete master profile...</div>;
+    return (
+      <PageLoader
+        title="Loading Master Profile..."
+        subtitle="Retrieving employee personal information, statutory records, and payroll configuration."
+      />
+    );
   }
 
   const SECTIONS = [
@@ -796,109 +905,316 @@ export default function EditEmployeePage() {
               </div>
             </div>
 
-            {formData.salary && (
-              <div className="border-t border-slate-100 pt-4 space-y-4">
-                <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Salary Components (Monthly/Annual)</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 text-xs">
-                  <div>
-                    <label className="font-semibold text-slate-700 block mb-1">Annual CTC</label>
-                    <input
-                      type="number"
-                      value={formData.salary.annual_ctc || 0}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        salary: { ...formData.salary, annual_ctc: Number(e.target.value) }
-                      })}
-                      className="w-full p-2 border border-slate-300 rounded font-mono font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-semibold text-slate-700 block mb-1">Basic Salary</label>
-                    <input
-                      type="number"
-                      value={formData.salary.basic || 0}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        salary: { ...formData.salary, basic: Number(e.target.value) }
-                      })}
-                      className="w-full p-2 border border-slate-300 rounded font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-semibold text-slate-700 block mb-1">HRA</label>
-                    <input
-                      type="number"
-                      value={formData.salary.hra || 0}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        salary: { ...formData.salary, hra: Number(e.target.value) }
-                      })}
-                      className="w-full p-2 border border-slate-300 rounded font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-semibold text-slate-700 block mb-1">Special Allowance</label>
-                    <input
-                      type="number"
-                      value={formData.salary.special_allowance || 0}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        salary: { ...formData.salary, special_allowance: Number(e.target.value) }
-                      })}
-                      className="w-full p-2 border border-slate-300 rounded font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-semibold text-slate-700 block mb-1">Monthly Gross</label>
-                    <input
-                      type="number"
-                      value={formData.salary.monthly_gross || 0}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        salary: { ...formData.salary, monthly_gross: Number(e.target.value) }
-                      })}
-                      className="w-full p-2 border border-slate-300 rounded font-mono font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-semibold text-slate-700 block mb-1">Monthly Net In-Hand</label>
-                    <input
-                      type="number"
-                      value={formData.salary.net_salary || 0}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        salary: { ...formData.salary, net_salary: Number(e.target.value) }
-                      })}
-                      className="w-full p-2 border border-emerald-300 rounded font-mono font-bold text-emerald-700 bg-emerald-50/40"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-semibold text-slate-700 block mb-1">Employee PF</label>
-                    <input
-                      type="number"
-                      value={formData.salary.employee_pf || 0}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        salary: { ...formData.salary, employee_pf: Number(e.target.value) }
-                      })}
-                      className="w-full p-2 border border-slate-300 rounded font-mono text-red-700"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-semibold text-slate-700 block mb-1">Employer PF</label>
-                    <input
-                      type="number"
-                      value={formData.salary.employer_pf || 0}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        salary: { ...formData.salary, employer_pf: Number(e.target.value) }
-                      })}
-                      className="w-full p-2 border border-slate-300 rounded font-mono text-red-700"
-                    />
-                  </div>
+            {/* Salary Components & Structure */}
+            <div className="border-t border-slate-100 pt-5 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                    <span>Salary Components &amp; Deductions</span>
+                    {hasExistingSalary ? (
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 normal-case">
+                        Active Persisted Record {formData.salary?.effective_date ? `(Effective: ${formData.salary.effective_date})` : ''}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 normal-case">
+                        No Prior Salary Record (Initialize Below)
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Configure standard CTC, statutory PF, PT, gratuity, and tax deductions
+                  </p>
+                </div>
+
+                {/* Calculation Tools */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleRecalculateSalary}
+                    className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    title="Calculate standard breakdown based on Annual CTC"
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
+                    Auto-Calculate Breakdown
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleCalculateInHand}
+                    className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-300 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    title="Calculate Net In-Hand from current values displayed in deduction fields"
+                  >
+                    <Calculator className="h-3.5 w-3.5 text-blue-600" />
+                    Calculate In-Hand
+                  </button>
                 </div>
               </div>
-            )}
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 text-xs bg-slate-50/70 p-4 rounded-xl border border-slate-200">
+                {/* 1. Annual CTC */}
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Annual CTC (INR)</label>
+                  <input
+                    type="number"
+                    value={formData.salary?.annual_ctc ?? 0}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      salary: { ...formData.salary, annual_ctc: Number(e.target.value) }
+                    })}
+                    className="w-full p-2 border border-slate-300 rounded font-mono font-bold text-slate-900 bg-white"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">{formatCurrency(formData.salary?.annual_ctc || 0)} / year</span>
+                </div>
+
+                {/* 2. Variable Pay */}
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Variable Pay (Annual)</label>
+                  <input
+                    type="number"
+                    value={formData.salary?.variable_pay ?? 0}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      salary: { ...formData.salary, variable_pay: Number(e.target.value) }
+                    })}
+                    className="w-full p-2 border border-slate-300 rounded font-mono bg-white"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">{formatCurrency(formData.salary?.variable_pay || 0)}</span>
+                </div>
+
+                {/* 3. Monthly Gross */}
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Monthly Gross (INR)</label>
+                  <input
+                    type="number"
+                    value={formData.salary?.monthly_gross ?? 0}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      salary: { ...formData.salary, monthly_gross: Number(e.target.value) }
+                    })}
+                    className="w-full p-2 border border-slate-300 rounded font-mono font-bold text-slate-900 bg-white"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">{formatCurrency(formData.salary?.monthly_gross || 0)} / month</span>
+                </div>
+
+                {/* 4. Basic Salary */}
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Basic Salary (Monthly)</label>
+                  <input
+                    type="number"
+                    value={formData.salary?.basic ?? 0}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      salary: { ...formData.salary, basic: Number(e.target.value) }
+                    })}
+                    className="w-full p-2 border border-slate-300 rounded font-mono bg-white"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">{formatCurrency(formData.salary?.basic || 0)}</span>
+                </div>
+
+                {/* 5. HRA */}
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">HRA (Monthly)</label>
+                  <input
+                    type="number"
+                    value={formData.salary?.hra ?? 0}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      salary: { ...formData.salary, hra: Number(e.target.value) }
+                    })}
+                    className="w-full p-2 border border-slate-300 rounded font-mono bg-white"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">{formatCurrency(formData.salary?.hra || 0)}</span>
+                </div>
+
+                {/* 6. Special Allowance */}
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Special Allowance</label>
+                  <input
+                    type="number"
+                    value={formData.salary?.special_allowance ?? 0}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      salary: { ...formData.salary, special_allowance: Number(e.target.value) }
+                    })}
+                    className="w-full p-2 border border-slate-300 rounded font-mono bg-white"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">{formatCurrency(formData.salary?.special_allowance || 0)}</span>
+                </div>
+
+                {/* 7. Conveyance */}
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Conveyance Allowance</label>
+                  <input
+                    type="number"
+                    value={formData.salary?.conveyance ?? 0}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      salary: { ...formData.salary, conveyance: Number(e.target.value) }
+                    })}
+                    className="w-full p-2 border border-slate-300 rounded font-mono bg-white"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">{formatCurrency(formData.salary?.conveyance || 0)}</span>
+                </div>
+
+                {/* 8. Other Allowances */}
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Other Allowances</label>
+                  <input
+                    type="number"
+                    value={formData.salary?.other_allowances ?? 0}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      salary: { ...formData.salary, other_allowances: Number(e.target.value) }
+                    })}
+                    className="w-full p-2 border border-slate-300 rounded font-mono bg-white"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">{formatCurrency(formData.salary?.other_allowances || 0)}</span>
+                </div>
+
+                {/* 9. Employee PF */}
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Employee PF (12%)</label>
+                  <input
+                    type="number"
+                    value={formData.salary?.employee_pf ?? 0}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      salary: { ...formData.salary, employee_pf: Number(e.target.value) }
+                    })}
+                    className="w-full p-2 border border-slate-300 rounded font-mono text-red-700 bg-white"
+                  />
+                  <span className="text-[10px] text-red-600 mt-0.5 block">-{formatCurrency(formData.salary?.employee_pf || 0)}</span>
+                </div>
+
+                {/* 10. Employer PF */}
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Employer PF (12%)</label>
+                  <input
+                    type="number"
+                    value={formData.salary?.employer_pf ?? 0}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      salary: { ...formData.salary, employer_pf: Number(e.target.value) }
+                    })}
+                    className="w-full p-2 border border-slate-300 rounded font-mono text-red-700 bg-white"
+                  />
+                  <span className="text-[10px] text-red-600 mt-0.5 block">-{formatCurrency(formData.salary?.employer_pf || 0)}</span>
+                </div>
+
+                {/* 11. Professional Tax */}
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Professional Tax (PT)</label>
+                  <input
+                    type="number"
+                    value={formData.salary?.professional_tax ?? 0}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      salary: { ...formData.salary, professional_tax: Number(e.target.value) }
+                    })}
+                    className="w-full p-2 border border-slate-300 rounded font-mono text-red-700 bg-white"
+                  />
+                  <span className="text-[10px] text-red-600 mt-0.5 block">-{formatCurrency(formData.salary?.professional_tax || 0)}</span>
+                </div>
+
+                {/* 12. Gratuity */}
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Gratuity Provision</label>
+                  <input
+                    type="number"
+                    value={formData.salary?.gratuity ?? 0}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      salary: { ...formData.salary, gratuity: Number(e.target.value) }
+                    })}
+                    className="w-full p-2 border border-slate-300 rounded font-mono text-red-700 bg-white"
+                  />
+                  <span className="text-[10px] text-red-600 mt-0.5 block">-{formatCurrency(formData.salary?.gratuity || 0)}</span>
+                </div>
+
+                {/* 13. TDS */}
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">TDS / Income Tax</label>
+                  <input
+                    type="number"
+                    value={formData.salary?.tds ?? 0}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      salary: { ...formData.salary, tds: Number(e.target.value) }
+                    })}
+                    className="w-full p-2 border border-slate-300 rounded font-mono text-red-700 bg-white"
+                  />
+                  <span className="text-[10px] text-red-600 mt-0.5 block">-{formatCurrency(formData.salary?.tds || 0)}</span>
+                </div>
+
+                {/* 14. ESIC */}
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">ESIC Deduction</label>
+                  <input
+                    type="number"
+                    value={formData.salary?.esic ?? 0}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      salary: { ...formData.salary, esic: Number(e.target.value) }
+                    })}
+                    className="w-full p-2 border border-slate-300 rounded font-mono text-red-700 bg-white"
+                  />
+                  <span className="text-[10px] text-red-600 mt-0.5 block">-{formatCurrency(formData.salary?.esic || 0)}</span>
+                </div>
+
+                {/* 15. Other Deductions */}
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Other Deductions</label>
+                  <input
+                    type="number"
+                    value={formData.salary?.other_deductions ?? 0}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      salary: { ...formData.salary, other_deductions: Number(e.target.value) }
+                    })}
+                    className="w-full p-2 border border-slate-300 rounded font-mono text-red-700 bg-white"
+                  />
+                  <span className="text-[10px] text-red-600 mt-0.5 block">-{formatCurrency(formData.salary?.other_deductions || 0)}</span>
+                </div>
+
+                {/* 16. Effective Date */}
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Salary Effective Date</label>
+                  <input
+                    type="date"
+                    value={formData.salary?.effective_date || ''}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      salary: { ...formData.salary, effective_date: e.target.value }
+                    })}
+                    className="w-full p-2 border border-slate-300 rounded font-mono bg-white"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">Revision date</span>
+                </div>
+              </div>
+
+              {/* Monthly Net In-Hand Highlight Card */}
+              <div className="p-4 bg-emerald-50/60 border border-emerald-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-bold text-emerald-900">Monthly Net (In-Hand) Take-Home</div>
+                  <div className="text-[11px] text-emerald-700">Calculated as Monthly Gross minus statutory &amp; tax deductions</div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="text-xl font-black font-mono text-emerald-700">
+                    {formatCurrency(formData.salary?.net_salary || 0)}
+                  </div>
+                  <input
+                    type="number"
+                    value={formData.salary?.net_salary ?? 0}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      salary: { ...formData.salary, net_salary: Number(e.target.value) }
+                    })}
+                    className="w-32 p-1.5 border border-emerald-300 rounded font-mono font-bold text-xs text-emerald-900 bg-white outline-none"
+                    title="Direct override if custom in-hand negotiated"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -984,14 +1300,24 @@ export default function EditEmployeePage() {
             <button
               type="submit"
               disabled={submitting}
-              className={`px-5 py-2.5 rounded-lg text-xs font-bold text-white transition flex items-center gap-2 ${
+              aria-busy={submitting}
+              className={`px-5 py-2.5 rounded-lg text-xs font-bold text-white transition flex items-center gap-2 select-none ${
                 submitting
-                  ? 'bg-blue-400 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-600/20'
+                  ? 'bg-blue-400 cursor-not-allowed opacity-80'
+                  : 'bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-600/20 cursor-pointer'
               }`}
             >
-              <Save className="h-4 w-4" />
-              {submitting ? 'Saving Changes...' : 'Save Profile Changes'}
+              {submitting ? (
+                <>
+                  <LoadingSpinner size="sm" variant="white" label="Saving Changes..." />
+                  <span>Saving Profile Changes...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4" />
+                  <span>Save Profile Changes</span>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -1035,17 +1361,21 @@ export default function EditEmployeePage() {
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 type="button"
+                disabled={submitting}
                 onClick={() => setShowIdConfirmModal(false)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold"
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="button"
+                disabled={submitting}
+                aria-busy={submitting}
                 onClick={executeSave}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-xs"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5"
               >
-                Confirm &amp; Update ID
+                {submitting && <LoadingSpinner size="xs" variant="white" label="Updating..." />}
+                <span>{submitting ? 'Updating...' : 'Confirm & Update ID'}</span>
               </button>
             </div>
           </div>

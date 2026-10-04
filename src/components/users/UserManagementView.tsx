@@ -20,8 +20,13 @@ import {
   Building2,
   RefreshCw,
   Search,
-  Filter
+  Filter,
+  RotateCcw,
+  Sparkles,
+  AlertCircle,
+  Plus
 } from 'lucide-react';
+import { LoadingSpinner, InlineLoader, TableSkeleton } from '@/components/ui/Loading';
 
 interface Props {
   initialUsers: User[];
@@ -34,6 +39,7 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
   const [loading, setLoading] = useState(false);
+  const [userActionType, setUserActionType] = useState<'ADD_USER' | 'EDIT_ROLE' | 'EDIT_DEPT' | 'DEACTIVATE' | 'DELETE' | 'RESET_PASS' | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Modals
@@ -65,6 +71,13 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
     effectivePermissions: PermissionCode[];
   } | null>(null);
   const [permLoading, setPermLoading] = useState(false);
+  const [removeConfirmModal, setRemoveConfirmModal] = useState<{
+    code: PermissionCode;
+    description: string;
+    isBase: boolean;
+    overrideType: 'GRANT' | 'DENY';
+  } | null>(null);
+  const [overrideActionLoading, setOverrideActionLoading] = useState(false);
 
   // One-time Temporary Password Modal
   const [tempPasswordModal, setTempPasswordModal] = useState<{ email: string; tempPassword: string; title: string } | null>(null);
@@ -101,6 +114,7 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setUserActionType('ADD_USER');
     setMessage(null);
     try {
       const res = await fetch('/api/users', {
@@ -134,6 +148,7 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
       setMessage({ type: 'error', text: err.message });
     } finally {
       setLoading(false);
+      setUserActionType(null);
     }
   };
 
@@ -143,6 +158,7 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
     }
 
     setLoading(true);
+    setUserActionType('RESET_PASS');
     setMessage(null);
     try {
       const res = await fetch(`/api/users/${targetUser.id}/reset-password`, {
@@ -162,6 +178,7 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
       setMessage({ type: 'error', text: err.message });
     } finally {
       setLoading(false);
+      setUserActionType(null);
     }
   };
 
@@ -196,6 +213,7 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
   const handleUpdateRole = async () => {
     if (!editRoleModalUser) return;
     setLoading(true);
+    setUserActionType('EDIT_ROLE');
     setMessage(null);
     try {
       const res = await fetch(`/api/users/${editRoleModalUser.id}`, {
@@ -213,12 +231,14 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
       setMessage({ type: 'error', text: err.message });
     } finally {
       setLoading(false);
+      setUserActionType(null);
     }
   };
 
   const handleUpdateDept = async () => {
     if (!editDeptModalUser || !targetDept.trim()) return;
     setLoading(true);
+    setUserActionType('EDIT_DEPT');
     setMessage(null);
     try {
       const res = await fetch(`/api/users/${editDeptModalUser.id}`, {
@@ -236,6 +256,7 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
       setMessage({ type: 'error', text: err.message });
     } finally {
       setLoading(false);
+      setUserActionType(null);
     }
   };
 
@@ -269,6 +290,7 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
   const handleConfirmDeactivate = async () => {
     if (!deactivateModalUser || !deactivationReason.trim()) return;
     setLoading(true);
+    setUserActionType('DEACTIVATE');
     setMessage(null);
     try {
       const res = await fetch(`/api/users/${deactivateModalUser.id}`, {
@@ -289,12 +311,14 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
       setMessage({ type: 'error', text: err.message });
     } finally {
       setLoading(false);
+      setUserActionType(null);
     }
   };
 
   const handleConfirmDelete = async () => {
     if (!deleteModalUser || !deleteReason.trim()) return;
     setLoading(true);
+    setUserActionType('DELETE');
     setMessage(null);
     try {
       const res = await fetch(`/api/users/${deleteModalUser.id}`, {
@@ -312,20 +336,26 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
       setMessage({ type: 'error', text: err.message });
     } finally {
       setLoading(false);
+      setUserActionType(null);
     }
   };
 
   const openPermissionsModal = async (targetUser: User) => {
     setPermissionModalUser(targetUser);
     setPermLoading(true);
+    setRemoveConfirmModal(null);
     try {
       const res = await fetch(`/api/users/${targetUser.id}/permissions`);
       if (res.ok) {
         const data = await res.json();
         setUserPermissions(data.permissions);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setMessage({ type: 'error', text: errData.error || 'Failed to load user permissions.' });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setMessage({ type: 'error', text: err.message || 'Error connecting to permissions service.' });
     } finally {
       setPermLoading(false);
     }
@@ -333,33 +363,55 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
 
   const handleSetPermissionOverride = async (code: PermissionCode, isGranted: boolean) => {
     if (!permissionModalUser) return;
+    setOverrideActionLoading(true);
     try {
       const res = await fetch(`/api/users/${permissionModalUser.id}/permissions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ permission_code: code, is_granted: isGranted }),
       });
-      if (res.ok) {
-        const data = await res.json();
+      const data = await res.json();
+      if (!res.ok) {
+        setMessage({ type: 'error', text: data.error || 'Failed to update permission override.' });
+      } else {
         setUserPermissions(data.permissions);
+        setMessage({
+          type: 'success',
+          text: `Permission override ${isGranted ? 'granted' : 'denied'} for ${code}.`,
+        });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setMessage({ type: 'error', text: err.message || 'Network error while updating permission.' });
+    } finally {
+      setOverrideActionLoading(false);
     }
   };
 
-  const handleResetPermissionOverride = async (code: PermissionCode) => {
-    if (!permissionModalUser) return;
+  const handleConfirmRemoveOverride = async () => {
+    if (!permissionModalUser || !removeConfirmModal) return;
+    const { code } = removeConfirmModal;
+    setOverrideActionLoading(true);
     try {
       const res = await fetch(`/api/users/${permissionModalUser.id}/permissions?permission_code=${code}`, {
         method: 'DELETE',
       });
-      if (res.ok) {
-        const data = await res.json();
+      const data = await res.json();
+      if (!res.ok) {
+        setMessage({ type: 'error', text: data.error || 'Failed to remove permission override.' });
+      } else {
         setUserPermissions(data.permissions);
+        setMessage({
+          type: 'success',
+          text: `Permission override removed for ${code}. Role default restored.`,
+        });
+        setRemoveConfirmModal(null);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setMessage({ type: 'error', text: err.message || 'Network error while resetting permission.' });
+    } finally {
+      setOverrideActionLoading(false);
     }
   };
 
@@ -466,7 +518,20 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
-              {filteredUsers.map((u) => {
+              {loading && filteredUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={isSuperAdmin ? 6 : 5} className="p-0">
+                    <TableSkeleton rows={4} columns={isSuperAdmin ? 6 : 5} />
+                  </td>
+                </tr>
+              ) : filteredUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={isSuperAdmin ? 6 : 5} className="px-5 py-8 text-center text-slate-400">
+                    No users found matching your search.
+                  </td>
+                </tr>
+              ) : (
+                filteredUsers.map((u) => {
                 const roleInfo = ROLE_LABELS[u.role] || { name: u.role, badgeColor: 'bg-slate-100 text-slate-800' };
                 const isSelf = u.id === currentUserId;
                 const isProtectedAdmin = u.role === 'SUPER_ADMIN' || u.email.toLowerCase() === 'admin@in.varsaka.com' || u.email.toLowerCase() === 'admin@varsaka.com';
@@ -662,7 +727,8 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
                     )}
                   </tr>
                 );
-              })}
+              })
+            )}
             </tbody>
           </table>
         </div>
@@ -758,17 +824,21 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
+                  disabled={loading}
                   onClick={() => setAddUserModalOpen(false)}
-                  className="px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  className="px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold disabled:opacity-50"
+                  aria-busy={loading && userActionType === 'ADD_USER'}
+                  aria-disabled={loading}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold disabled:opacity-50 inline-flex items-center gap-2"
                 >
-                  {loading ? 'Creating...' : 'Create System User'}
+                  {loading && userActionType === 'ADD_USER' && <LoadingSpinner size="xs" variant="white" />}
+                  <span>{loading && userActionType === 'ADD_USER' ? 'Creating User...' : 'Create System User'}</span>
                 </button>
               </div>
             </form>
@@ -805,18 +875,22 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
             <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
               <button
                 type="button"
+                disabled={loading}
                 onClick={() => setEditRoleModalUser(null)}
-                className="px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700"
+                className="px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700 disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 disabled={loading}
+                aria-busy={loading && userActionType === 'EDIT_ROLE'}
+                aria-disabled={loading}
                 onClick={handleUpdateRole}
-                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold disabled:opacity-50"
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold disabled:opacity-50 inline-flex items-center gap-2"
               >
-                Save Role
+                {loading && userActionType === 'EDIT_ROLE' && <LoadingSpinner size="xs" variant="white" />}
+                <span>{loading && userActionType === 'EDIT_ROLE' ? 'Saving Role...' : 'Save Role'}</span>
               </button>
             </div>
           </div>
@@ -848,18 +922,22 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
             <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
               <button
                 type="button"
+                disabled={loading}
                 onClick={() => setEditDeptModalUser(null)}
-                className="px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700"
+                className="px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700 disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 disabled={loading || !targetDept.trim()}
+                aria-busy={loading && userActionType === 'EDIT_DEPT'}
+                aria-disabled={loading || !targetDept.trim()}
                 onClick={handleUpdateDept}
-                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold disabled:opacity-50"
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold disabled:opacity-50 inline-flex items-center gap-2"
               >
-                Save Department
+                {loading && userActionType === 'EDIT_DEPT' && <LoadingSpinner size="xs" variant="white" />}
+                <span>{loading && userActionType === 'EDIT_DEPT' ? 'Saving Department...' : 'Save Department'}</span>
               </button>
             </div>
           </div>
@@ -900,18 +978,22 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
             <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
               <button
                 type="button"
+                disabled={loading}
                 onClick={() => setDeactivateModalUser(null)}
-                className="px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700"
+                className="px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700 disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 disabled={loading || !deactivationReason.trim()}
+                aria-busy={loading && userActionType === 'DEACTIVATE'}
+                aria-disabled={loading || !deactivationReason.trim()}
                 onClick={handleConfirmDeactivate}
-                className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold disabled:opacity-50"
+                className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold disabled:opacity-50 inline-flex items-center gap-2"
               >
-                Confirm Deactivation
+                {loading && userActionType === 'DEACTIVATE' && <LoadingSpinner size="xs" variant="white" />}
+                <span>{loading && userActionType === 'DEACTIVATE' ? 'Deactivating...' : 'Confirm Deactivation'}</span>
               </button>
             </div>
           </div>
@@ -956,18 +1038,22 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
             <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
               <button
                 type="button"
+                disabled={loading}
                 onClick={() => setDeleteModalUser(null)}
-                className="px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700"
+                className="px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700 disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 disabled={loading || !deleteReason.trim()}
+                aria-busy={loading && userActionType === 'DELETE'}
+                aria-disabled={loading || !deleteReason.trim()}
                 onClick={handleConfirmDelete}
-                className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold disabled:opacity-50"
+                className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold disabled:opacity-50 inline-flex items-center gap-2"
               >
-                Confirm Delete
+                {loading && userActionType === 'DELETE' && <LoadingSpinner size="xs" variant="white" />}
+                <span>{loading && userActionType === 'DELETE' ? 'Deleting...' : 'Confirm Delete'}</span>
               </button>
             </div>
           </div>
@@ -1002,8 +1088,8 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
 
             <div className="overflow-y-auto flex-1 pr-1">
               {permLoading ? (
-                <div className="py-12 text-center text-xs text-slate-400">
-                  Loading server-side permission records...
+                <div className="py-12 flex justify-center">
+                  <InlineLoader text="Loading server-side permission records..." size="md" />
                 </div>
               ) : (
                 <table className="w-full text-left text-xs border border-slate-200 rounded-lg">
@@ -1019,75 +1105,112 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
                   <tbody className="divide-y divide-slate-100">
                     {allAvailablePermissions.map((code) => {
                       const isBase = userPermissions?.basePermissions?.includes(code) || false;
-                      const override = userPermissions?.overrides?.find(o => o.permission_code === code);
+                      const override = userPermissions?.overrides?.find((o) => o.permission_code === code);
                       const isEffective = userPermissions?.effectivePermissions?.includes(code) || false;
 
-                      let sourceLabel = 'Role-derived';
-                      let sourceColor = 'bg-slate-100 text-slate-700';
-
+                      // Visual differentiation: Role base vs User override
+                      let sourceBadge: React.ReactNode;
                       if (override) {
                         if (override.is_granted) {
-                          sourceLabel = 'Explicitly Granted';
-                          sourceColor = 'bg-emerald-100 text-emerald-800 font-bold';
+                          sourceBadge = (
+                            <span className="text-[10px] px-2 py-0.5 rounded border border-amber-300 bg-amber-50 text-amber-900 font-bold inline-flex items-center gap-1 shadow-2xs">
+                              <Sparkles className="h-3 w-3 text-amber-600" />
+                              Grant Override
+                            </span>
+                          );
                         } else {
-                          sourceLabel = 'Explicitly Revoked';
-                          sourceColor = 'bg-red-100 text-red-800 font-bold';
+                          sourceBadge = (
+                            <span className="text-[10px] px-2 py-0.5 rounded border border-red-300 bg-red-50 text-red-900 font-bold inline-flex items-center gap-1 shadow-2xs">
+                              <AlertCircle className="h-3 w-3 text-red-600" />
+                              Deny Override
+                            </span>
+                          );
                         }
-                      } else if (!isBase) {
-                        sourceLabel = 'Not in Role';
-                        sourceColor = 'bg-slate-50 text-slate-400';
+                      } else if (isBase) {
+                        sourceBadge = (
+                          <span className="text-[10px] px-2 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-800 font-medium inline-flex items-center gap-1">
+                            <ShieldCheck className="h-3 w-3 text-blue-600" />
+                            In Role ({permissionModalUser.role})
+                          </span>
+                        );
+                      } else {
+                        sourceBadge = (
+                          <span className="text-[10px] px-2 py-0.5 rounded border border-slate-200 bg-slate-50 text-slate-500 font-medium inline-flex items-center gap-1">
+                            Not in Role
+                          </span>
+                        );
                       }
 
                       return (
-                        <tr key={code} className="hover:bg-slate-50/60">
-                          <td className="px-4 py-2 font-mono font-bold text-slate-900 text-[11px]">
+                        <tr key={code} className={`hover:bg-slate-50/70 transition-colors ${override ? 'bg-amber-50/20' : ''}`}>
+                          <td className="px-4 py-2.5 font-mono font-bold text-slate-900 text-[11px]">
                             {code}
                           </td>
-                          <td className="px-4 py-2 text-slate-600 text-[11px]">
+                          <td className="px-4 py-2.5 text-slate-600 text-[11px]">
                             {PERMISSION_DESCRIPTIONS[code]}
                           </td>
-                          <td className="px-4 py-2">
-                            <span className={`text-[10px] px-2 py-0.5 rounded border border-slate-200 ${sourceColor}`}>
-                              {sourceLabel}
-                            </span>
+                          <td className="px-4 py-2.5">
+                            {sourceBadge}
                           </td>
-                          <td className="px-4 py-2 text-center">
+                          <td className="px-4 py-2.5 text-center">
                             {isEffective ? (
-                              <span className="inline-flex items-center gap-1 text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 text-[10px]">
-                                <CheckCircle2 className="h-3 w-3" />
+                              <span className="inline-flex items-center gap-1 text-emerald-800 font-bold bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 text-[10px] shadow-2xs">
+                                <CheckCircle2 className="h-3 w-3 text-emerald-600" />
                                 Granted
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 text-slate-400 font-semibold bg-slate-50 px-2 py-0.5 rounded border border-slate-200 text-[10px]">
-                                <XCircle className="h-3 w-3" />
+                              <span className="inline-flex items-center gap-1 text-slate-500 font-semibold bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200 text-[10px]">
+                                <XCircle className="h-3 w-3 text-slate-400" />
                                 Denied
                               </span>
                             )}
                           </td>
                           {isSuperAdmin && (
-                            <td className="px-4 py-2 text-right space-x-1 whitespace-nowrap">
-                              {override ? (
+                            <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                              {permissionModalUser.role === 'SUPER_ADMIN' ? (
+                                <span className="text-[10px] text-slate-400 italic">Super Admin All-Access</span>
+                              ) : permissionModalUser.id === currentUserId ? (
+                                <span className="text-[10px] text-slate-400 italic">Self-modification blocked</span>
+                              ) : override ? (
                                 <button
                                   type="button"
-                                  onClick={() => handleResetPermissionOverride(code)}
-                                  className="px-2 py-0.5 border border-slate-300 hover:bg-slate-100 rounded text-[10px] font-bold text-slate-700"
+                                  disabled={overrideActionLoading}
+                                  onClick={() =>
+                                    setRemoveConfirmModal({
+                                      code,
+                                      description: PERMISSION_DESCRIPTIONS[code],
+                                      isBase,
+                                      overrideType: override.is_granted ? 'GRANT' : 'DENY',
+                                    })
+                                  }
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 border border-amber-300 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 text-amber-900 rounded-md text-[10px] font-bold transition shadow-2xs cursor-pointer"
+                                  title="Remove temporary user-level override and reset to role default"
                                 >
-                                  Reset
+                                  <RotateCcw className="h-3 w-3 text-amber-700" />
+                                  Remove Override
                                 </button>
                               ) : isBase ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleSetPermissionOverride(code, false)}
-                                  className="px-2 py-0.5 border border-red-300 bg-red-50 hover:bg-red-100 rounded text-[10px] font-bold text-red-700"
-                                >
-                                  Revoke
-                                </button>
+                                <div className="inline-flex items-center gap-2">
+                                  <span className="text-[11px] text-slate-400 font-medium">Inherited from Role</span>
+                                  <button
+                                    type="button"
+                                    disabled={overrideActionLoading}
+                                    onClick={() => handleSetPermissionOverride(code, false)}
+                                    className="px-2 py-0.5 border border-red-200 bg-red-50/60 hover:bg-red-100 text-red-700 rounded text-[10px] font-semibold transition cursor-pointer"
+                                    title="Explicitly deny this permission for this user"
+                                  >
+                                    Deny Override
+                                  </button>
+                                </div>
                               ) : (
                                 <button
                                   type="button"
+                                  disabled={overrideActionLoading}
                                   onClick={() => handleSetPermissionOverride(code, true)}
-                                  className="px-2 py-0.5 border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 rounded text-[10px] font-bold text-emerald-700"
+                                  className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-md text-[10px] font-bold shadow-2xs transition cursor-pointer"
+                                  title="Temporarily grant this permission to this user"
                                 >
+                                  <Plus className="h-3 w-3" />
                                   Grant
                                 </button>
                               )}
@@ -1112,6 +1235,86 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 6B. REMOVE PERMISSION OVERRIDE CONFIRMATION MODAL (PART 6)                 */}
+      {/* ========================================================================= */}
+      {removeConfirmModal && permissionModalUser && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-start gap-3 border-b pb-3 border-slate-100">
+              <div className="p-2.5 bg-amber-100 text-amber-800 rounded-xl shrink-0">
+                <RotateCcw className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Remove Permission Override?</h3>
+                <p className="text-xs text-slate-500">
+                  Reset permission to role-derived default for <strong>{permissionModalUser.full_name}</strong>.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3 text-xs">
+              <div>
+                <span className="text-slate-500 font-semibold block text-[11px] uppercase tracking-wider">Permission:</span>
+                <span className="font-mono font-bold text-slate-900 text-xs block mt-0.5">
+                  {removeConfirmModal.code}
+                </span>
+                <span className="text-slate-600 text-[11px] block">
+                  {removeConfirmModal.description}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200">
+                <div>
+                  <span className="text-slate-500 font-semibold block text-[10px] uppercase">Current State:</span>
+                  <span className={`text-xs font-bold block mt-0.5 ${
+                    removeConfirmModal.overrideType === 'GRANT' ? 'text-emerald-700' : 'text-red-700'
+                  }`}>
+                    {removeConfirmModal.overrideType === 'GRANT' ? 'Granted by User Override' : 'Denied by User Override'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 font-semibold block text-[10px] uppercase">After Removal:</span>
+                  <span className={`text-xs font-bold block mt-0.5 ${
+                    removeConfirmModal.isBase ? 'text-emerald-700' : 'text-slate-600'
+                  }`}>
+                    {removeConfirmModal.isBase
+                      ? `Granted — inherited from ${permissionModalUser.role} role`
+                      : `Denied — inherited from ${permissionModalUser.role} role`}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 leading-relaxed">
+              Removing this override will delete the explicit user-level override and immediately restore the user&apos;s inherited role default.
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={overrideActionLoading}
+                onClick={() => setRemoveConfirmModal(null)}
+                className="px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={overrideActionLoading}
+                aria-busy={overrideActionLoading}
+                aria-disabled={overrideActionLoading}
+                onClick={handleConfirmRemoveOverride}
+                className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+              >
+                {overrideActionLoading ? <LoadingSpinner size="xs" variant="white" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                <span>{overrideActionLoading ? 'Removing...' : 'Remove Override'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

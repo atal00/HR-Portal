@@ -7,7 +7,6 @@ import { canAccessSalary, hasPermission } from '@/lib/rbac';
 import { formatDate, formatCurrency, maskPanNumber, maskBankNumber } from '@/lib/utils';
 import {
   User,
-  Building2,
   Mail,
   Phone,
   MapPin,
@@ -21,9 +20,7 @@ import {
   Edit2,
   ShieldCheck,
   ExternalLink,
-  FolderOpen,
-  CreditCard,
-  FileBadge
+  FolderOpen
 } from 'lucide-react';
 
 import { EmployeeDeletionButton } from '@/components/employees/EmployeeDeletionButton';
@@ -470,13 +467,22 @@ export default async function EmployeeDetailPage({ params }: Props) {
                     <div>Employee PF: <strong className="font-mono text-red-700">{formatCurrency(salary.employee_pf)}</strong></div>
                     <div>Employer PF: <strong className="font-mono text-red-700">{formatCurrency(salary.employer_pf)}</strong></div>
                     <div>Prof. Tax: <strong className="font-mono text-red-700">{formatCurrency(salary.professional_tax)}</strong></div>
+                    <div>Gratuity: <strong className="font-mono text-red-700">{formatCurrency(salary.gratuity || 0)}</strong></div>
                     <div>TDS: <strong className="font-mono text-red-700">{formatCurrency(salary.tds)}</strong></div>
+                    <div>ESIC: <strong className="font-mono text-red-700">{formatCurrency(salary.esic || 0)}</strong></div>
+                    <div>Other Ded: <strong className="font-mono text-red-700">{formatCurrency(salary.other_deductions || 0)}</strong></div>
                   </div>
                 </div>
               </div>
             ) : hasSalaryAccess && !salary ? (
-              <div className="p-6 text-center text-xs text-slate-500">
-                No compensation record initialized for this employee.
+              <div className="p-6 text-center text-xs text-slate-500 space-y-2">
+                <div>No compensation record initialized for this employee.</div>
+                <Link
+                  href={`/employees/${employee.id}/edit`}
+                  className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-semibold"
+                >
+                  Initialize Compensation in Edit Profile &rarr;
+                </Link>
               </div>
             ) : (
               <div className="p-6 bg-slate-50 rounded-lg border border-dashed border-slate-300 text-center space-y-2">

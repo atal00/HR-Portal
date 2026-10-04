@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Lock, KeyRound, ShieldAlert, CheckCircle2, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/Loading';
 
 export default function ChangePasswordClient() {
   const router = useRouter();
@@ -249,9 +250,12 @@ export default function ChangePasswordClient() {
               <button
                 type="submit"
                 disabled={loading || !isFormValid}
-                className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm transition disabled:opacity-50 cursor-pointer mt-2"
+                aria-busy={loading}
+                aria-disabled={loading || !isFormValid}
+                className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-lg text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm transition disabled:opacity-50 cursor-pointer mt-2"
               >
-                {loading ? 'Updating Credentials...' : 'Save Password & Setup Authenticator'}
+                {loading && <LoadingSpinner size="xs" variant="white" />}
+                <span>{loading ? 'Updating Credentials...' : 'Save Password & Setup Authenticator'}</span>
               </button>
             </form>
           </div>

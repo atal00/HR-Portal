@@ -51,10 +51,12 @@ function assert(condition: boolean, testName: string, failureDetails?: string) {
 }
 
 function createJsonRequest(url: string, body: any, headers: Record<string, string> = {}): NextRequest {
+  const testIp = headers['x-forwarded-for'] || `127.0.1.${Math.floor(Math.random() * 200 + 10)}`;
   return new NextRequest(new URL(url, 'http://localhost:3000'), {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
+      'x-forwarded-for': testIp,
       ...headers,
     },
     body: JSON.stringify(body),
@@ -343,7 +345,8 @@ async function runTestSuite() {
     password: createdNewUser.tempPassword!,
   });
   const resOldPass = await loginHandler(loginReqOldPass);
-  assert(resOldPass.status === 401, 'Old password fails with HTTP 401');
+  const oldPassBody = await resOldPass.json().catch(() => ({}));
+  assert(resOldPass.status === 401, 'Old password fails with HTTP 401', `Status: ${resOldPass.status}, Body: ${JSON.stringify(oldPassBody)}`);
 
   // New temporary password succeeds
   const loginReqNewPass = createJsonRequest('http://localhost:3000/api/auth/login', {
@@ -351,7 +354,8 @@ async function runTestSuite() {
     password: newTempPass,
   });
   const resNewPass = await loginHandler(loginReqNewPass);
-  assert(resNewPass.status === 200, 'New temporary password succeeds with HTTP 200');
+  const newPassBody = await resNewPass.json().catch(() => ({}));
+  assert(resNewPass.status === 200, 'New temporary password succeeds with HTTP 200', `Status: ${resNewPass.status}, Body: ${JSON.stringify(newPassBody)}`);
 
   // Clean up test users
   console.log(`\n${BOLD}Test Cleanup${RESET}`);

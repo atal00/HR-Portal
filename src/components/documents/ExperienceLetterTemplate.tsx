@@ -2,6 +2,8 @@ import React from 'react';
 import { ExperienceLetterData } from '@/types/document';
 import { formatDate, calculateTenure } from '@/lib/utils';
 import { QRCodeSVG } from 'qrcode.react';
+import { AuthorizedSignatoryBlock } from './AuthorizedSignatoryBlock';
+
 
 interface Props {
   data: ExperienceLetterData;
@@ -96,38 +98,15 @@ export const ExperienceLetterTemplate: React.FC<Props> = ({
         </div>
 
         {/* Signature & Seal Section */}
-        <div className="pt-8 flex items-end justify-between">
-          <div className="space-y-1">
-            <div className="h-12 flex items-center">
-              {signatureUrl && (
-                <img 
-                  src={signatureUrl} 
-                  alt="Authorized Signature" 
-                  width={120} 
-                  height={44} 
-                  style={{ height: '44px', width: 'auto', maxHeight: '44px' }} 
-                  className="h-11 w-auto opacity-85 object-contain" 
-                />
-              )}
-            </div>
-            <div className="font-bold text-sm text-blue-950">{signatoryName}</div>
-            <div className="text-xs text-slate-700 font-semibold">{signatoryTitle}</div>
-            <div className="text-xs text-slate-600">{companyName}</div>
-          </div>
-
-          <div className="flex flex-col items-center">
-            {stampUrl && (
-              <img 
-                src={stampUrl} 
-                alt="Official Seal" 
-                width={84} 
-                height={84} 
-                style={{ height: '84px', width: 'auto', maxHeight: '84px' }} 
-                className="h-20 w-auto object-contain opacity-90 shrink-0" 
-              />
-            )}
-            <span className="text-[9px] uppercase tracking-widest text-slate-400 mt-1">Official Company Seal</span>
-          </div>
+        <div className="pt-8">
+          <AuthorizedSignatoryBlock
+            signatoryName={signatoryName}
+            signatoryTitle={signatoryTitle}
+            companyName={companyName}
+            signatureUrl={signatureUrl}
+            stampUrl={stampUrl}
+            showSeal={true}
+          />
         </div>
 
         {/* Verification Strip */}

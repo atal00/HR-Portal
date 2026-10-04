@@ -142,7 +142,191 @@ class InMemoryRateLimiter {
   }
 }
 
-// Global singleton to preserve across Next.js dev server hot-reloads
-const globalForLimiter = globalThis as unknown as { rateLimiter: InMemoryRateLimiter };
+/**
+ * Token Bucket Rate Limiter
+ * 
+ * Capacity: 5 tokens
+ * Initial: 5 tokens
+ * Consumption: 1 token per failed login attempt
+ * Refill: Exactly 1 token every 15 minutes (continuous elapsed time calculation)
+ * Maximum: 5 tokens
+ * Success: Immediately resets bucket to 5 tokens
+ */
+export interface TokenBucketRecord {
+  tokens: number;
+  lastRefill: number; // ms timestamp
+}
+
+export class TokenBucketRateLimiter {
+  private store = new Map<string, TokenBucketRecord>();
+  private readonly capacity: number;
+  private readonly refillIntervalMs: number;
+  private cleanupInterval: NodeJS.Timeout | null = null;
+
+  constructor(capacity: number = 5, refillMinutes: number = 15) {
+    this.capacity = capacity;
+    this.refillIntervalMs = refillMinutes * 60 * 1000;
+
+    if (typeof setInterval !== 'undefined') {
+      this.cleanupInterval = setInterval(() => this.cleanup(), 15 * 60 * 1000);
+      if (this.cleanupInterval.unref) {
+        this.cleanupInterval.unref();
+      }
+    }
+  }
+
+  /**
+   * Refills tokens based on continuous elapsed time since last refill.
+   */
+  private updateBucket(record: TokenBucketRecord, now: number = Date.now()): void {
+    if (record.tokens >= this.capacity) {
+      record.lastRefill = now;
+      return;
+    }
+
+    const elapsed = now - record.lastRefill;
+    if (elapsed >= this.refillIntervalMs) {
+      const tokensToAdd = Math.floor(elapsed / this.refillIntervalMs);
+      if (tokensToAdd > 0) {
+        record.tokens = Math.min(this.capacity, record.tokens + tokensToAdd);
+        record.lastRefill += tokensToAdd * this.refillIntervalMs;
+        if (record.tokens >= this.capacity) {
+          record.lastRefill = now;
+        }
+      }
+    }
+  }
+
+  /**
+   * Inspect current bucket state without consuming tokens.
+   */
+  public check(key: string, now: number = Date.now()): {
+    allowed: boolean;
+    remainingTokens: number;
+    lockoutSeconds: number;
+  } {
+    const record = this.store.get(key);
+    if (!record) {
+      return {
+        allowed: true,
+        remainingTokens: this.capacity,
+        lockoutSeconds: 0,
+      };
+    }
+
+    this.updateBucket(record, now);
+
+    if (record.tokens < 1) {
+      const elapsedSinceRefill = now - record.lastRefill;
+      const timeUntilNextTokenMs = Math.max(0, this.refillIntervalMs - elapsedSinceRefill);
+      const lockoutSeconds = Math.max(1, Math.ceil(timeUntilNextTokenMs / 1000));
+      return {
+        allowed: false,
+        remainingTokens: 0,
+        lockoutSeconds,
+      };
+    }
+
+    return {
+      allowed: true,
+      remainingTokens: record.tokens,
+      lockoutSeconds: 0,
+    };
+  }
+
+  /**
+   * Consume exactly 1 token on failed login attempt.
+   */
+  public consume(key: string, now: number = Date.now()): {
+    isLocked: boolean;
+    remainingTokens: number;
+    lockoutSeconds: number;
+  } {
+    let record = this.store.get(key);
+    if (!record) {
+      record = {
+        tokens: this.capacity,
+        lastRefill: now,
+      };
+      this.store.set(key, record);
+    }
+
+    this.updateBucket(record, now);
+
+    if (record.tokens > 0) {
+      record.tokens -= 1;
+      // If we just consumed from capacity, mark lastRefill at this moment
+      if (record.tokens === this.capacity - 1 && record.lastRefill > now) {
+        record.lastRefill = now;
+      }
+    }
+
+    const isLocked = record.tokens < 1;
+    let lockoutSeconds = 0;
+    if (isLocked) {
+      const elapsedSinceRefill = now - record.lastRefill;
+      const timeUntilNextTokenMs = Math.max(0, this.refillIntervalMs - elapsedSinceRefill);
+      lockoutSeconds = Math.max(1, Math.ceil(timeUntilNextTokenMs / 1000));
+    }
+
+    return {
+      isLocked,
+      remainingTokens: record.tokens,
+      lockoutSeconds,
+    };
+  }
+
+  /**
+   * Reset bucket immediately to full capacity (5 tokens) upon successful authentication.
+   */
+  public reset(key: string): void {
+    this.store.delete(key);
+  }
+
+  /**
+   * Test/Diagnostic helper to query raw state.
+   */
+  public getState(key: string, now: number = Date.now()): { tokens: number; lastRefill: number } {
+    const record = this.store.get(key);
+    if (!record) {
+      return { tokens: this.capacity, lastRefill: now };
+    }
+    this.updateBucket(record, now);
+    return { tokens: record.tokens, lastRefill: record.lastRefill };
+  }
+
+  /**
+   * Test/Diagnostic helper to simulate passage of time or token counts.
+   */
+  public setBucket(key: string, tokens: number, lastRefill: number): void {
+    this.store.set(key, {
+      tokens: Math.min(this.capacity, Math.max(0, tokens)),
+      lastRefill,
+    });
+  }
+
+  private cleanup(): void {
+    const now = Date.now();
+    const maxRetention = 2 * this.capacity * this.refillIntervalMs; // 2.5 hours
+    for (const [key, record] of this.store.entries()) {
+      this.updateBucket(record, now);
+      if (record.tokens >= this.capacity && (now - record.lastRefill) > maxRetention) {
+        this.store.delete(key);
+      }
+    }
+  }
+}
+
+// Global singletons to preserve across Next.js dev server hot-reloads
+const globalForLimiter = globalThis as unknown as {
+  rateLimiter: InMemoryRateLimiter;
+  loginTokenBucket: TokenBucketRateLimiter;
+};
+
 export const rateLimiter = globalForLimiter.rateLimiter || new InMemoryRateLimiter();
-if (process.env.NODE_ENV !== 'production') globalForLimiter.rateLimiter = rateLimiter;
+export const loginTokenBucket = globalForLimiter.loginTokenBucket || new TokenBucketRateLimiter(5, 15);
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForLimiter.rateLimiter = rateLimiter;
+  globalForLimiter.loginTokenBucket = loginTokenBucket;
+}

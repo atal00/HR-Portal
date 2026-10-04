@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Award, ExternalLink, Send, CheckCircle2, Clock, AlertCircle, ArrowLeft, Shield } from 'lucide-react';
 import { CertificateAccessRequest } from '@/types/database';
+import { LoadingSpinner, InlineLoader } from '@/components/ui/Loading';
 
 export default function CertificateAccessPage() {
   const [modalOpen, setModalOpen] = useState(false);
@@ -117,7 +118,11 @@ export default function CertificateAccessPage() {
         </div>
 
         {/* Existing Request Status Badge */}
-        {pendingRequest && (
+        {loading ? (
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center">
+            <InlineLoader text="Checking certificate clearance status..." size="sm" />
+          </div>
+        ) : pendingRequest ? (
           <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-xs">
             <div className="flex items-center gap-2 text-amber-900">
               <Clock className="h-4 w-4 text-amber-600 animate-spin" />
@@ -127,7 +132,7 @@ export default function CertificateAccessPage() {
               PENDING
             </span>
           </div>
-        )}
+        ) : null}
 
         {approvedRequest && (
           <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs">
@@ -206,11 +211,15 @@ export default function CertificateAccessPage() {
               <button
                 type="button"
                 disabled={submitting}
+                aria-busy={submitting}
                 onClick={handleSendRequest}
-                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition shadow-xs disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
               >
                 {submitting ? (
-                  <>Sending Request...</>
+                  <>
+                    <LoadingSpinner size="xs" variant="white" label="Sending Request..." />
+                    <span>Sending Request...</span>
+                  </>
                 ) : (
                   <>
                     <Send className="h-3.5 w-3.5" />

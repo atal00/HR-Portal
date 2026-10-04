@@ -23,7 +23,9 @@ export async function GET(
     }
 
     const { employeeId } = await params;
-    const salary = await db.salary.getByEmployeeId(employeeId);
+    const { searchParams } = new URL(req.url);
+    const effectiveDate = searchParams.get('effectiveDate') || undefined;
+    const salary = await db.salary.getByEmployeeId(employeeId, effectiveDate);
 
     if (!salary) {
       return NextResponse.json({ error: 'Salary record not found for this employee.' }, { status: 404 });

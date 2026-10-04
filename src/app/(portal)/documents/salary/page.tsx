@@ -4,11 +4,12 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { SalarySlipData } from '@/types/document';
-import { Employee, EmployeeSalary } from '@/types/database';
+import { Employee } from '@/types/database';
 import { numberToWordsINR } from '@/lib/utils';
 import { SalarySlipTemplate } from '@/components/documents/SalarySlipTemplate';
 import { Banknote, Eye, CheckCircle2, User, ArrowLeft, Calendar } from 'lucide-react';
 import Link from 'next/link';
+import { LoadingSpinner } from '@/components/ui/Loading';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -95,24 +96,38 @@ export default function GenerateSalarySlipPage() {
     try {
       const salRes = await fetch(`/api/salary/${emp.id}`);
       if (salRes.ok) {
-        const sal: EmployeeSalary = await salRes.json();
-        setValue('basic', sal.basic);
-        setValue('hra', sal.hra);
-        setValue('communicationAllowance', sal.communication_allowance);
-        setValue('travelAllowance', sal.travel_allowance);
-        setValue('foodAllowance', sal.food_allowance);
-        setValue('otherAllowances', sal.other_allowances);
-        setValue('grossSalary', sal.monthly_gross);
-        setValue('employeePf', sal.employee_pf);
-        setValue('employerPf', sal.employer_pf);
-        setValue('professionalTax', sal.professional_tax);
-        setValue('gratuity', sal.gratuity);
-        setValue('tds', sal.tds);
+        const sal: any = await salRes.json();
+        const basic = Number(sal.basic ?? sal.basic_pay ?? 0);
+        const hra = Number(sal.hra ?? 0);
+        const comm = Number(sal.communication_allowance ?? sal.internet_allowance ?? 0);
+        const travel = Number(sal.travel_allowance ?? 0);
+        const food = Number(sal.food_allowance ?? 0);
+        const other = Number(sal.other_allowances ?? sal.other_allowance ?? 0);
+        const gross = Number(sal.monthly_gross ?? (basic + hra + comm + travel + food + other));
+        const empPf = Number(sal.employee_pf ?? sal.employee_pf_contribution ?? 0);
+        const emplyrPf = Number(sal.employer_pf ?? sal.employer_pf_contribution ?? 0);
+        const pt = Number(sal.professional_tax ?? sal.prof_tax ?? 0);
+        const grat = Number(sal.gratuity ?? 0);
+        const tds = Number(sal.tds ?? sal.other_deductions ?? 0);
 
-        const totalDed = sal.employee_pf + sal.employer_pf + sal.professional_tax + sal.gratuity + sal.tds;
+        setValue('basic', basic);
+        setValue('hra', hra);
+        setValue('communicationAllowance', comm);
+        setValue('travelAllowance', travel);
+        setValue('foodAllowance', food);
+        setValue('otherAllowances', other);
+        setValue('grossSalary', gross);
+        setValue('employeePf', empPf);
+        setValue('employerPf', emplyrPf);
+        setValue('professionalTax', pt);
+        setValue('gratuity', grat);
+        setValue('tds', tds);
+
+        const totalDed = empPf + emplyrPf + pt + grat + tds;
         setValue('totalDeductions', totalDed);
-        setValue('netSalary', sal.net_salary);
-        setValue('netSalaryInWords', numberToWordsINR(sal.net_salary));
+        const net = sal.net_salary !== undefined && sal.net_salary !== null ? Number(sal.net_salary) : Math.max(0, gross - totalDed);
+        setValue('netSalary', net);
+        setValue('netSalaryInWords', numberToWordsINR(net));
 
         // Employee-specific PAN
         const pan = sal.pan_number || emp.pan_number || '';
@@ -364,10 +379,20 @@ export default function GenerateSalarySlipPage() {
             <button
               type="submit"
               disabled={generating}
-              className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-lg text-xs font-bold transition shadow-sm disabled:opacity-50"
+              aria-busy={generating}
+              className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-lg text-xs font-bold transition shadow-sm disabled:opacity-50 select-none cursor-pointer"
             >
-              <CheckCircle2 className="h-4 w-4" />
-              {generating ? 'Submitting...' : 'Generate & Issue Salary Slip'}
+              {generating ? (
+                <>
+                  <LoadingSpinner size="sm" variant="white" label="Generating Salary Slip..." />
+                  <span>Generating Salary Slip...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>Generate &amp; Issue Salary Slip</span>
+                </>
+              )}
             </button>
           </div>
 

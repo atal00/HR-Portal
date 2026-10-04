@@ -10,6 +10,7 @@ import {
   Download,
   CheckCircle2,
 } from 'lucide-react';
+import { LoadingSpinner, InlineLoader } from '@/components/ui/Loading';
 
 interface MfaEnrollmentCardProps {
   onSuccess?: () => void;
@@ -143,9 +144,8 @@ export default function MfaEnrollmentCard({
 
   if (loading) {
     return (
-      <div className="p-8 text-center space-y-3">
-        <div className="h-8 w-8 mx-auto border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
-        <p className="text-xs text-slate-500">Generating secure authenticator credentials...</p>
+      <div className="py-12 flex justify-center">
+        <InlineLoader text="Generating secure authenticator credentials..." size="md" />
       </div>
     );
   }
@@ -341,9 +341,12 @@ export default function MfaEnrollmentCard({
         <button
           type="submit"
           disabled={verifying || verificationCode.length !== 6 || !hasAcknowledgedRecovery}
-          className="w-full flex justify-center items-center py-2.5 px-4 border border-transparent rounded-lg text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm transition disabled:opacity-50 cursor-pointer"
+          aria-busy={verifying}
+          aria-disabled={verifying || verificationCode.length !== 6 || !hasAcknowledgedRecovery}
+          className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-lg text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm transition disabled:opacity-50 cursor-pointer"
         >
-          {verifying ? 'Verifying Code...' : 'Verify & Enable MFA'}
+          {verifying && <LoadingSpinner size="xs" variant="white" />}
+          <span>{verifying ? 'Verifying Code...' : 'Verify & Enable MFA'}</span>
         </button>
       </form>
     </div>

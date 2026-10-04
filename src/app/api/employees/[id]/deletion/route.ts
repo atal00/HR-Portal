@@ -12,14 +12,26 @@ export async function GET(
     const { id } = await params;
 
     if (!hasPermission(sessionUser, 'employee.view')) {
-      return NextResponse.json({ error: 'Forbidden: Missing employee.view permission.' }, { status: 403 });
+      return NextResponse.json({
+        success: false,
+        canPurge: false,
+        tasksTableAvailable: false,
+        error: 'Forbidden: Missing employee.view permission.',
+        blockingReason: 'Forbidden: Missing employee.view permission.'
+      }, { status: 403 });
     }
 
     const dependencies = await db.employees.getDeletionDependencies(id);
     return NextResponse.json({ success: true, ...dependencies });
   } catch (error: any) {
     return NextResponse.json(
-      { error: error.message || 'Internal Server Error' },
+      {
+        success: false,
+        canPurge: false,
+        tasksTableAvailable: false,
+        error: error.message || 'Internal Server Error',
+        blockingReason: error.message || 'Failed to verify deletion prerequisites.'
+      },
       { status: error.status || 500 }
     );
   }

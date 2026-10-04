@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { TaskRecord, TaskPriority, TaskStatus, RoleCode } from '@/types/database';
 import { formatDate } from '@/lib/utils';
 import { toast } from 'react-hot-toast';
+import { TableSkeleton, LoadingSpinner } from '@/components/ui/Loading';
 import {
   CheckSquare,
   Plus,
@@ -74,6 +75,7 @@ export default function TasksPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<TaskRecord | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [actionType, setActionType] = useState<'CREATE' | 'START' | 'BLOCK' | 'RESUME' | 'COMPLETE' | 'CANCEL' | 'REASSIGN' | null>(null);
 
   // Create Form State
   const [createTitle, setCreateTitle] = useState('');
@@ -177,6 +179,7 @@ export default function TasksPage() {
     }
 
     setIsSubmitting(true);
+    setActionType('CREATE');
     try {
       const res = await fetch('/api/tasks', {
         method: 'POST',
@@ -204,12 +207,18 @@ export default function TasksPage() {
       toast.error(err.message || 'Error creating task');
     } finally {
       setIsSubmitting(false);
+      setActionType(null);
     }
   };
 
   // Update Task Action
-  const handleUpdateTaskStatus = async (taskId: string, newStatus: TaskStatus) => {
+  const handleUpdateTaskStatus = async (
+    taskId: string,
+    newStatus: TaskStatus,
+    action?: 'START' | 'BLOCK' | 'RESUME' | 'COMPLETE' | 'CANCEL'
+  ) => {
     setIsSubmitting(true);
+    if (action) setActionType(action);
     try {
       const res = await fetch(`/api/tasks/${taskId}`, {
         method: 'PATCH',
@@ -231,6 +240,7 @@ export default function TasksPage() {
       toast.error(err.message || 'Network error updating task');
     } finally {
       setIsSubmitting(false);
+      setActionType(null);
     }
   };
 
@@ -238,6 +248,7 @@ export default function TasksPage() {
   const handleReassignTask = async (taskId: string) => {
     if (!newAssigneeId) return;
     setIsSubmitting(true);
+    setActionType('REASSIGN');
     try {
       const res = await fetch(`/api/tasks/${taskId}`, {
         method: 'PATCH',
@@ -257,9 +268,10 @@ export default function TasksPage() {
         toast.error(data.error || 'Failed to reassign task');
       }
     } catch (err: any) {
-      toast.error(err.message || 'Error reassigning task');
+      toast.error(err.message || 'Network error reassigning task');
     } finally {
       setIsSubmitting(false);
+      setActionType(null);
     }
   };
 
@@ -353,7 +365,7 @@ export default function TasksPage() {
           <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-lg text-xs font-semibold">
             <button
               onClick={() => setView('my')}
-              className={`px-3 py-1.5 rounded-md transition ${
+              className={`px-3 py-1.5 rounded-md transition cursor-pointer ${
                 view === 'my' ? 'bg-white text-blue-600 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -361,7 +373,7 @@ export default function TasksPage() {
             </button>
             <button
               onClick={() => setView('assigned_by_me')}
-              className={`px-3 py-1.5 rounded-md transition ${
+              className={`px-3 py-1.5 rounded-md transition cursor-pointer ${
                 view === 'assigned_by_me' ? 'bg-white text-blue-600 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -370,7 +382,7 @@ export default function TasksPage() {
             {isPrivileged && (
               <button
                 onClick={() => setView('all')}
-                className={`px-3 py-1.5 rounded-md transition ${
+                className={`px-3 py-1.5 rounded-md transition cursor-pointer ${
                   view === 'all' ? 'bg-white text-blue-600 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -403,7 +415,7 @@ export default function TasksPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-600"
+            className="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer"
           >
             <option value="ALL">All Statuses</option>
             <option value="TODO">To Do</option>
@@ -417,7 +429,7 @@ export default function TasksPage() {
           <select
             value={priorityFilter}
             onChange={(e) => setPriorityFilter(e.target.value)}
-            className="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-600"
+            className="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer"
           >
             <option value="ALL">All Priorities</option>
             <option value="URGENT">Urgent</option>
@@ -429,10 +441,11 @@ export default function TasksPage() {
       </div>
 
       {/* Task List Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-        {loading ? (
-          <div className="p-12 text-center text-xs text-slate-500">Loading tasks...</div>
-        ) : tasks.length === 0 ? (
+      {loading ? (
+        <TableSkeleton rows={6} columns={8} />
+      ) : (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+          {tasks.length === 0 ? (
           <div className="p-16 text-center space-y-2">
             <CheckSquare className="h-10 w-10 text-slate-300 mx-auto" />
             <h3 className="font-bold text-slate-800 text-sm">No tasks found</h3>
@@ -548,7 +561,7 @@ export default function TasksPage() {
                             setSelectedTask(task);
                             setShowReassignDropdown(false);
                           }}
-                          className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-[11px] transition inline-flex items-center gap-1"
+                          className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-[11px] transition inline-flex items-center gap-1 cursor-pointer"
                         >
                           Details
                           <ChevronRight className="h-3 w-3" />
@@ -562,6 +575,7 @@ export default function TasksPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* ======================================================================= */}
       {/* CREATE TASK MODAL                                                       */}
@@ -576,7 +590,7 @@ export default function TasksPage() {
               </div>
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="text-slate-400 hover:text-slate-600 p-1"
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -618,7 +632,7 @@ export default function TasksPage() {
                   <select
                     value={createAssignTo}
                     onChange={(e) => setCreateAssignTo(e.target.value)}
-                    className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 text-xs text-slate-800 font-medium"
+                    className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 text-xs text-slate-800 font-medium cursor-pointer"
                   >
                     <option value="me">Me ({currentUser?.full_name || 'Current User'})</option>
                     {staffList
@@ -638,7 +652,7 @@ export default function TasksPage() {
                   <select
                     value={createPriority}
                     onChange={(e) => setCreatePriority(e.target.value as TaskPriority)}
-                    className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 text-xs text-slate-800 font-medium"
+                    className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 text-xs text-slate-800 font-medium cursor-pointer"
                   >
                     <option value="LOW">Low</option>
                     <option value="MEDIUM">Medium</option>
@@ -656,7 +670,7 @@ export default function TasksPage() {
                   type="date"
                   value={createDueDate}
                   onChange={(e) => setCreateDueDate(e.target.value)}
-                  className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 text-xs text-slate-800"
+                  className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 text-xs text-slate-800 cursor-pointer"
                 />
               </div>
 
@@ -668,7 +682,7 @@ export default function TasksPage() {
                   <select
                     value={createEmployeeId}
                     onChange={(e) => setCreateEmployeeId(e.target.value)}
-                    className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 text-xs text-slate-800"
+                    className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 text-xs text-slate-800 cursor-pointer"
                   >
                     <option value="">None / General</option>
                     {employeeList.map((emp) => (
@@ -686,7 +700,7 @@ export default function TasksPage() {
                   <select
                     value={createDocumentId}
                     onChange={(e) => setCreateDocumentId(e.target.value)}
-                    className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 text-xs text-slate-800"
+                    className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 text-xs text-slate-800 cursor-pointer"
                   >
                     <option value="">None / General</option>
                     {documentList.map((doc) => (
@@ -702,16 +716,20 @@ export default function TasksPage() {
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-semibold"
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-semibold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting || !createTitle.trim()}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition disabled:opacity-50"
+                  aria-busy={isSubmitting && actionType === 'CREATE'}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed flex items-center gap-1.5"
                 >
-                  {isSubmitting ? 'Creating...' : 'Create Task'}
+                  {isSubmitting && actionType === 'CREATE' && (
+                    <LoadingSpinner size="xs" variant="white" label="Creating..." />
+                  )}
+                  <span>{isSubmitting && actionType === 'CREATE' ? 'Creating Task...' : 'Create Task'}</span>
                 </button>
               </div>
             </form>
@@ -740,7 +758,7 @@ export default function TasksPage() {
               </div>
               <button
                 onClick={() => setSelectedTask(null)}
-                className="text-slate-400 hover:text-slate-600 p-1"
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -800,7 +818,7 @@ export default function TasksPage() {
                   <span className="text-slate-400 font-semibold block text-[10px] uppercase">Related Document:</span>
                   <Link
                     href={`/documents/${selectedTask.document_id}`}
-                    className="font-mono font-bold text-blue-600 hover:underline inline-flex items-center gap-1"
+                    className="font-mono font-bold text-blue-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
                   >
                     {selectedTask.document_number}
                     <ExternalLink className="h-3 w-3" />
@@ -818,7 +836,7 @@ export default function TasksPage() {
                   <select
                     value={newAssigneeId}
                     onChange={(e) => setNewAssigneeId(e.target.value)}
-                    className="flex-1 p-2 bg-white border border-slate-300 rounded-lg text-xs"
+                    className="flex-1 p-2 bg-white border border-slate-300 rounded-lg text-xs cursor-pointer"
                   >
                     <option value="">Select staff user...</option>
                     <option value="me">Me (Self-assign)</option>
@@ -831,13 +849,17 @@ export default function TasksPage() {
                   <button
                     onClick={() => handleReassignTask(selectedTask.id)}
                     disabled={!newAssigneeId || isSubmitting}
-                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold disabled:opacity-50"
+                    aria-busy={isSubmitting && actionType === 'REASSIGN'}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed flex items-center gap-1.5"
                   >
-                    Reassign
+                    {isSubmitting && actionType === 'REASSIGN' && (
+                      <LoadingSpinner size="xs" variant="white" label="Reassigning..." />
+                    )}
+                    <span>{isSubmitting && actionType === 'REASSIGN' ? 'Reassigning...' : 'Reassign'}</span>
                   </button>
                   <button
                     onClick={() => setShowReassignDropdown(false)}
-                    className="px-2.5 py-1.5 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-100"
+                    className="px-2.5 py-1.5 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-100 cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -858,7 +880,7 @@ export default function TasksPage() {
                       }
                       setShowReassignDropdown(true);
                     }}
-                    className="px-3 py-1.5 border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5"
+                    className="px-3 py-1.5 border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
                   >
                     <Users className="h-3.5 w-3.5 text-slate-500" />
                     Reassign
@@ -868,12 +890,17 @@ export default function TasksPage() {
                 {/* Cancel Task */}
                 {(isPrivileged || selectedTask.created_by === currentUser?.id) && selectedTask.status !== 'CANCELLED' && (
                   <button
-                    onClick={() => handleUpdateTaskStatus(selectedTask.id, 'CANCELLED')}
+                    onClick={() => handleUpdateTaskStatus(selectedTask.id, 'CANCELLED', 'CANCEL')}
                     disabled={isSubmitting}
-                    className="px-3 py-1.5 text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5"
+                    aria-busy={isSubmitting && actionType === 'CANCEL'}
+                    className="px-3 py-1.5 text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <XCircle className="h-3.5 w-3.5 text-rose-500" />
-                    Cancel Task
+                    {isSubmitting && actionType === 'CANCEL' ? (
+                      <LoadingSpinner size="xs" variant="red" label="Cancelling..." />
+                    ) : (
+                      <XCircle className="h-3.5 w-3.5 text-rose-500" />
+                    )}
+                    <span>{isSubmitting && actionType === 'CANCEL' ? 'Cancelling...' : 'Cancel Task'}</span>
                   </button>
                 )}
               </div>
@@ -882,48 +909,68 @@ export default function TasksPage() {
                 {/* Start Task */}
                 {selectedTask.status === 'TODO' && (
                   <button
-                    onClick={() => handleUpdateTaskStatus(selectedTask.id, 'IN_PROGRESS')}
+                    onClick={() => handleUpdateTaskStatus(selectedTask.id, 'IN_PROGRESS', 'START')}
                     disabled={isSubmitting}
-                    className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-xs inline-flex items-center gap-1.5"
+                    aria-busy={isSubmitting && actionType === 'START'}
+                    className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-xs inline-flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <Play className="h-3.5 w-3.5" />
-                    Start Task
+                    {isSubmitting && actionType === 'START' ? (
+                      <LoadingSpinner size="xs" variant="white" label="Starting..." />
+                    ) : (
+                      <Play className="h-3.5 w-3.5" />
+                    )}
+                    <span>{isSubmitting && actionType === 'START' ? 'Starting...' : 'Start Task'}</span>
                   </button>
                 )}
 
                 {/* Mark Blocked */}
                 {(selectedTask.status === 'TODO' || selectedTask.status === 'IN_PROGRESS') && (
                   <button
-                    onClick={() => handleUpdateTaskStatus(selectedTask.id, 'BLOCKED')}
+                    onClick={() => handleUpdateTaskStatus(selectedTask.id, 'BLOCKED', 'BLOCK')}
                     disabled={isSubmitting}
-                    className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 rounded-lg text-xs font-bold inline-flex items-center gap-1.5"
+                    aria-busy={isSubmitting && actionType === 'BLOCK'}
+                    className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
-                    Mark Blocked
+                    {isSubmitting && actionType === 'BLOCK' ? (
+                      <LoadingSpinner size="xs" variant="primary" label="Marking Blocked..." />
+                    ) : (
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                    )}
+                    <span>{isSubmitting && actionType === 'BLOCK' ? 'Marking Blocked...' : 'Mark Blocked'}</span>
                   </button>
                 )}
 
                 {/* Resume if Blocked */}
                 {selectedTask.status === 'BLOCKED' && (
                   <button
-                    onClick={() => handleUpdateTaskStatus(selectedTask.id, 'IN_PROGRESS')}
+                    onClick={() => handleUpdateTaskStatus(selectedTask.id, 'IN_PROGRESS', 'RESUME')}
                     disabled={isSubmitting}
-                    className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1.5"
+                    aria-busy={isSubmitting && actionType === 'RESUME'}
+                    className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <RotateCcw className="h-3.5 w-3.5" />
-                    Resume Task
+                    {isSubmitting && actionType === 'RESUME' ? (
+                      <LoadingSpinner size="xs" variant="white" label="Resuming..." />
+                    ) : (
+                      <RotateCcw className="h-3.5 w-3.5" />
+                    )}
+                    <span>{isSubmitting && actionType === 'RESUME' ? 'Resuming...' : 'Resume Task'}</span>
                   </button>
                 )}
 
                 {/* Mark Completed */}
                 {selectedTask.status !== 'COMPLETED' && selectedTask.status !== 'CANCELLED' && (
                   <button
-                    onClick={() => handleUpdateTaskStatus(selectedTask.id, 'COMPLETED')}
+                    onClick={() => handleUpdateTaskStatus(selectedTask.id, 'COMPLETED', 'COMPLETE')}
                     disabled={isSubmitting}
-                    className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs inline-flex items-center gap-1.5"
+                    aria-busy={isSubmitting && actionType === 'COMPLETE'}
+                    className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs inline-flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    Mark Completed
+                    {isSubmitting && actionType === 'COMPLETE' ? (
+                      <LoadingSpinner size="xs" variant="white" label="Completing..." />
+                    ) : (
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                    )}
+                    <span>{isSubmitting && actionType === 'COMPLETE' ? 'Completing...' : 'Mark Completed'}</span>
                   </button>
                 )}
               </div>

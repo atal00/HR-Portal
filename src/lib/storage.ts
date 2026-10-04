@@ -98,11 +98,37 @@ export async function createSupabaseSignedDownloadUrl(filePath: string, expiresI
 }
 
 /**
+ * Retrieves the cryptographic secret for HMAC-signed download tokens.
+ * In production (NODE_ENV === 'production' or STORAGE_MODE === 'supabase'),
+ * strictly requires a valid SESSION_SECRET from the environment.
+ * Silent fallback to static defaults in production is strictly prohibited.
+ */
+export function getStorageDownloadSecret(): string {
+  const isProd =
+    process.env.NODE_ENV === 'production' ||
+    process.env.STORAGE_MODE === 'supabase' ||
+    process.env.NEXT_PUBLIC_APP_URL?.includes('varsaka.com') === true;
+  const secret = process.env.SESSION_SECRET;
+
+  if (isProd) {
+    if (!secret || typeof secret !== 'string' || secret.trim().length < 32 || secret.includes('placeholder')) {
+      throw new Error(
+        'FATAL CONFIGURATION ERROR: SESSION_SECRET is not configured or insufficient in production for storage token verification.'
+      );
+    }
+    return secret.trim();
+  }
+
+  // Development / Test fallback only
+  return (secret && secret.trim()) || 'varsaka-hr-secret';
+}
+
+/**
  * Generates an HMAC-signed time-limited download URL
  * Default expiration: 15 minutes (900 seconds)
  */
 export function generateSignedDownloadToken(documentId: string, expiresInSeconds: number = 900): string {
-  const secret = process.env.SESSION_SECRET || 'varsaka-hr-secret';
+  const secret = getStorageDownloadSecret();
   const expiresAt = Date.now() + expiresInSeconds * 1000;
   const payload = `${documentId}:${expiresAt}`;
   const signature = crypto.createHmac('sha256', secret).update(payload).digest('hex');
@@ -114,7 +140,7 @@ export function generateSignedDownloadToken(documentId: string, expiresInSeconds
  */
 export function verifySignedDownloadToken(token: string): { valid: boolean; documentId?: string; error?: string } {
   try {
-    const secret = process.env.SESSION_SECRET || 'varsaka-hr-secret';
+    const secret = getStorageDownloadSecret();
     const jsonStr = Buffer.from(token, 'base64url').toString('utf-8');
     const { documentId, expiresAt, signature } = JSON.parse(jsonStr);
 

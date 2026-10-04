@@ -8,8 +8,9 @@ import {
   markChallengeNonceConsumed,
   MFA_CHALLENGE_COOKIE,
 } from '@/lib/mfa';
-import { signSessionPayload, AUTH_COOKIE } from '@/lib/auth';
+import { signSessionPayload, AUTH_COOKIE, LAST_ACTIVITY_COOKIE } from '@/lib/auth';
 import { logAuditEvent, logSecurityEvent } from '@/lib/audit';
+import { loginTokenBucket } from '@/lib/rate-limit';
 
 export async function POST(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || '127.0.0.1';
@@ -160,6 +161,8 @@ export async function POST(req: NextRequest) {
     const isTotpValid = verifyTotpCode(code, plaintextSecret);
 
     if (!isTotpValid) {
+      loginTokenBucket.consume(`login:account:${user.email.toLowerCase()}`);
+      loginTokenBucket.consume(`login:ip:${ip}`);
       const lockStatus = await db.userMfa.recordFailedAttempt(user.id, 5, 15);
 
       await logSecurityEvent({
@@ -191,8 +194,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 7. TOTP Valid! Reset MFA failed attempts
+    // 7. TOTP Valid! Reset MFA failed attempts and login token buckets
     await db.userMfa.resetFailedAttempts(user.id);
+    loginTokenBucket.reset(`login:account:${user.email.toLowerCase()}`);
+    loginTokenBucket.reset(`login:ip:${ip}`);
 
     // 7b. ATOMIC CHALLENGE CONSUMPTION (Prevents Concurrent Request Race)
     // Guarantees only ONE concurrent request can consume the nonce and create a varsaka_session
@@ -261,6 +266,13 @@ export async function POST(req: NextRequest) {
       name: AUTH_COOKIE.name,
       value: sessionToken,
       ...AUTH_COOKIE.options,
+    });
+
+    // Set initial activity timestamp cookie
+    res.cookies.set({
+      name: LAST_ACTIVITY_COOKIE.name,
+      value: Date.now().toString(),
+      ...LAST_ACTIVITY_COOKIE.options,
     });
 
     // Clear challenge cookie

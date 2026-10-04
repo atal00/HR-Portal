@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const authHeader = req.headers.get('x-break-glass-key') || body.recovery_key;
 
-    const configuredSecret = process.env.BREAK_GLASS_RECOVERY_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const configuredSecret = process.env.BREAK_GLASS_RECOVERY_KEY;
     if (!configuredSecret) {
       return NextResponse.json(
         { error: 'Emergency break-glass recovery is not configured on this server.' },

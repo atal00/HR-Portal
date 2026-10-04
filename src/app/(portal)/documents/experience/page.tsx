@@ -9,6 +9,7 @@ import { ExperienceLetterTemplate } from '@/components/documents/ExperienceLette
 import { calculateTenure } from '@/lib/utils';
 import { FileSpreadsheet, Eye, CheckCircle2, User, ArrowLeft, Clock, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
+import { LoadingSpinner } from '@/components/ui/Loading';
 
 export default function GenerateExperienceLetterPage() {
   const router = useRouter();
@@ -351,10 +352,20 @@ export default function GenerateExperienceLetterPage() {
             <button
               type="submit"
               disabled={generating}
-              className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-lg text-xs font-bold transition shadow-sm disabled:opacity-50"
+              aria-busy={generating}
+              className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-lg text-xs font-bold transition shadow-sm disabled:opacity-50 select-none cursor-pointer"
             >
-              <CheckCircle2 className="h-4 w-4" />
-              {generating ? 'Issuing Certificate...' : 'Generate & Send for Approval'}
+              {generating ? (
+                <>
+                  <LoadingSpinner size="sm" variant="white" label="Generating Experience Letter..." />
+                  <span>Generating Experience Letter...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>Generate &amp; Send for Approval</span>
+                </>
+              )}
             </button>
           </div>
 

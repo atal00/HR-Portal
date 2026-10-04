@@ -17,7 +17,8 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_emp RECORD;
-  v_doc_ids UUID[];
+  v_draft_doc_ids UUID[];
+  v_retained_docs_count INT;
   v_purged_code TEXT;
   v_purged_name TEXT;
   v_jwt_claims JSONB;
@@ -61,49 +62,65 @@ BEGIN
   v_purged_code := v_emp.employee_id;
   v_purged_name := v_emp.full_name;
 
-  -- 3. Gather all document IDs owned by this employee
-  SELECT COALESCE(ARRAY_AGG(id), '{}') INTO v_doc_ids
-  FROM public.documents
-  WHERE employee_id = p_employee_id;
-
-  -- 4. Execute cascading cleanup in verified foreign key dependency order
-  IF ARRAY_LENGTH(v_doc_ids, 1) > 0 THEN
-    -- Unlink verification logs (Preserves legal verification trail without hard FK block)
-    UPDATE public.verification_logs
-    SET document_id = NULL
-    WHERE document_id = ANY(v_doc_ids);
-
-    -- Unlink tasks referencing these documents (if tasks table exists)
-    IF to_regclass('public.tasks') IS NOT NULL THEN
-      EXECUTE 'UPDATE public.tasks SET document_id = NULL WHERE document_id = ANY($1)' USING v_doc_ids;
-    END IF;
-
-    -- Delete document versions & approvals for employee documents
-    DELETE FROM public.document_versions
-    WHERE document_id = ANY(v_doc_ids);
-
-    DELETE FROM public.approvals
-    WHERE document_id = ANY(v_doc_ids);
-
-    -- Delete employee-owned documents
-    DELETE FROM public.documents
-    WHERE id = ANY(v_doc_ids);
+  -- 3. Materialized Tasks Table Prerequisite Check:
+  -- Destructive purge must not silently skip or bypass operational tasks.
+  -- The native public.tasks table must exist before employee purge can execute.
+  IF to_regclass('public.tasks') IS NULL THEN
+    RAISE EXCEPTION 'PRECONDITION_FAILED: Employee purge is temporarily unavailable because the required Tasks database table is not installed. Contact the Super Administrator.';
   END IF;
 
-  -- 5. Delete employee-owned salary record
+  -- 4. Document Legal Retention Guard:
+  -- Official documents (APPROVED, FINAL, REVOKED) represent immutable statutory records.
+  -- Official documents cannot be deleted and linked employees cannot be physically purged.
+  SELECT COUNT(*) INTO v_retained_docs_count
+  FROM public.documents
+  WHERE employee_id = p_employee_id
+    AND status::text IN ('APPROVED', 'FINAL', 'REVOKED');
+
+  IF v_retained_docs_count > 0 THEN
+    RAISE EXCEPTION 'LEGAL_RETENTION_VIOLATION: Employee purge is blocked: Employee % has % official document(s) in APPROVED, FINAL, or REVOKED status. Under statutory document retention rules, official documents cannot be deleted and linked employee records cannot be physically purged.', v_purged_code, v_retained_docs_count;
+  END IF;
+
+  -- 5. Gather only unapproved draft/pending document IDs owned by this employee
+  SELECT COALESCE(ARRAY_AGG(id), '{}') INTO v_draft_doc_ids
+  FROM public.documents
+  WHERE employee_id = p_employee_id
+    AND status::text NOT IN ('APPROVED', 'FINAL', 'REVOKED');
+
+  -- 6. Execute cascading cleanup of draft documents in verified foreign key dependency order
+  IF ARRAY_LENGTH(v_draft_doc_ids, 1) > 0 THEN
+    -- Unlink verification logs for draft items if any
+    UPDATE public.verification_logs
+    SET document_id = NULL
+    WHERE document_id = ANY(v_draft_doc_ids);
+
+    -- Unlink tasks referencing these draft documents
+    EXECUTE 'UPDATE public.tasks SET document_id = NULL WHERE document_id = ANY($1)' USING v_draft_doc_ids;
+
+    -- Delete document versions & approvals for draft documents
+    DELETE FROM public.document_versions
+    WHERE document_id = ANY(v_draft_doc_ids);
+
+    DELETE FROM public.approvals
+    WHERE document_id = ANY(v_draft_doc_ids);
+
+    -- Delete draft documents
+    DELETE FROM public.documents
+    WHERE id = ANY(v_draft_doc_ids);
+  END IF;
+
+  -- 7. Delete employee-owned salary record
   DELETE FROM public.employee_salary
   WHERE employee_id = p_employee_id;
 
-  -- 6. Delete operational tasks assigned to or created for the employee (if tasks table exists)
-  IF to_regclass('public.tasks') IS NOT NULL THEN
-    EXECUTE 'DELETE FROM public.tasks WHERE employee_id = $1' USING p_employee_id;
-  END IF;
+  -- 8. Delete operational tasks assigned to or created for the employee
+  EXECUTE 'DELETE FROM public.tasks WHERE employee_id = $1' USING p_employee_id;
 
-  -- 7. Delete employee metadata in system_settings key-value store
+  -- 9. Delete employee metadata in system_settings key-value store
   DELETE FROM public.system_settings
   WHERE key = 'emp_meta_' || p_employee_id::TEXT;
 
-  -- 8. Permanently delete employee master record
+  -- 10. Permanently delete employee master record
   DELETE FROM public.employees
   WHERE id = p_employee_id;
 

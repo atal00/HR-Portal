@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Employee } from '@/types/database';
 import { Trash2, AlertTriangle, ShieldCheck, CheckCircle2, ShieldAlert, FileText, Banknote, ListTodo } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/Loading';
 
 interface Props {
   employee: Employee;
@@ -21,9 +22,16 @@ export function EmployeeDeletionButton({ employee, userRole }: Props) {
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [dependencies, setDependencies] = useState<{
     documentsCount: number;
+    retainedDocumentsCount: number;
+    draftDocumentsCount: number;
     hasSalary: boolean;
     tasksCount: number;
+    tasksTableAvailable: boolean;
+    canPurge: boolean;
+    blockingReason: string | null;
   } | null>(null);
+  const [loadingDeps, setLoadingDeps] = useState(false);
+  const [depsError, setDepsError] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [isRejecting, setIsRejecting] = useState(false);
 
@@ -34,8 +42,102 @@ export function EmployeeDeletionButton({ employee, userRole }: Props) {
   const isProtected = !!employee.is_system_protected;
   const isSuperAdmin = userRole === 'SUPER_ADMIN';
 
+  const fetchDependencies = async () => {
+    setLoadingDeps(true);
+    setDepsError(null);
+    try {
+      const res = await fetch(`/api/employees/${employee.id}/deletion`);
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success !== false) {
+        setDependencies({
+          documentsCount: Number(data.documentsCount ?? data.dependencies?.documentsCount ?? 0),
+          retainedDocumentsCount: Number(data.retainedDocumentsCount ?? 0),
+          draftDocumentsCount: Number(data.draftDocumentsCount ?? 0),
+          hasSalary: Boolean(data.hasSalary ?? (data.salaryCount > 0)),
+          tasksCount: Number(data.tasksCount ?? data.dependencies?.tasksCount ?? 0),
+          tasksTableAvailable: data.tasksTableAvailable === true,
+          canPurge: data.canPurge === true,
+          blockingReason: data.blockingReason ?? null,
+        });
+      } else {
+        // FAIL CLOSED: On non-200 or failure flag, mark purge unavailable
+        const errorMsg = data.error || data.blockingReason || 'Failed to verify deletion prerequisites.';
+        setDepsError(errorMsg);
+        setDependencies({
+          documentsCount: 0,
+          retainedDocumentsCount: 0,
+          draftDocumentsCount: 0,
+          hasSalary: false,
+          tasksCount: 0,
+          tasksTableAvailable: false,
+          canPurge: false,
+          blockingReason: errorMsg,
+        });
+      }
+    } catch (err: any) {
+      console.error('Error fetching deletion dependencies:', err);
+      const errorMsg = err?.message || 'Failed to verify deletion prerequisites due to network error.';
+      setDepsError(errorMsg);
+      setDependencies({
+        documentsCount: 0,
+        retainedDocumentsCount: 0,
+        draftDocumentsCount: 0,
+        hasSalary: false,
+        tasksCount: 0,
+        tasksTableAvailable: false,
+        canPurge: false,
+        blockingReason: errorMsg,
+      });
+    } finally {
+      setLoadingDeps(false);
+    }
+  };
+
+  const handleOpenPurge = async () => {
+    setPurgeModalOpen(true);
+    setPurgeConfirmation('');
+    setError(null);
+    setDepsError(null);
+    setDependencies(null); // Explicit reset guarantees fail-closed state while loading
+    await fetchDependencies();
+  };
+
+  // Derived state to distinguish the 4 key conditions (Requirement 8):
+  // 1. Missing database prerequisite (tasksTableAvailable === false or error mentions tasks)
+  const isTasksMissingFromDeps = !loadingDeps && !!dependencies && dependencies.tasksTableAvailable === false;
+  const isTasksMissingFromError = !!error && (error.toLowerCase().includes('tasks') || error.includes('public.tasks'));
+  const isPrerequisiteMissing = isTasksMissingFromDeps || isTasksMissingFromError;
+
+  // 2. Official document retention block
+  const isRetentionBlocked = !loadingDeps && !!dependencies && dependencies.retainedDocumentsCount > 0;
+
+  // 3. Preflight check API failure
+  const isPreflightFailed = !loadingDeps && (!!depsError || (!dependencies && !loadingDeps));
+
+  // Comprehensive fail-closed blocker
+  const isBlocked = isProtected || 
+                    loadingDeps || 
+                    !dependencies || 
+                    dependencies.canPurge !== true || 
+                    dependencies.tasksTableAvailable !== true || 
+                    isRetentionBlocked || 
+                    isPrerequisiteMissing ||
+                    isPreflightFailed ||
+                    !!error;
+
   const handlePurge = async () => {
-    if (purgeConfirmation !== 'DELETE') return;
+    // FAIL-CLOSED DEFENSE-IN-DEPTH:
+    // Block submission immediately if blocked, purging, or confirmation mismatch
+    if (isBlocked || isPurging || purgeConfirmation !== 'DELETE') {
+      return;
+    }
+
+    // Explicit prerequisite verification check before dispatching destructive call
+    if (!dependencies || dependencies.tasksTableAvailable !== true || dependencies.canPurge !== true) {
+      setError('Employee purge is temporarily unavailable because the required Tasks database table is not installed. Contact the Super Administrator.');
+      return;
+    }
+
     setIsPurging(true);
     setError(null);
     try {
@@ -44,8 +146,18 @@ export function EmployeeDeletionButton({ employee, userRole }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ confirmation: 'DELETE' }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to purge employee record.');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (data.tasksTableAvailable === false || data.error?.toLowerCase().includes('tasks')) {
+          setDependencies(prev => prev ? {
+            ...prev,
+            tasksTableAvailable: false,
+            canPurge: false,
+            blockingReason: 'Employee purge is temporarily unavailable because the required Tasks database table is not installed. Contact the Super Administrator.',
+          } : null);
+        }
+        throw new Error(data.error || 'Failed to purge employee record.');
+      }
       setPurgeModalOpen(false);
       router.push('/employees');
     } catch (err: any) {
@@ -57,9 +169,10 @@ export function EmployeeDeletionButton({ employee, userRole }: Props) {
 
   const renderPurgeModal = () => {
     if (!purgeModalOpen) return null;
+
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-xs p-4">
-        <div className="bg-white rounded-2xl border border-red-300 shadow-2xl max-w-md w-full p-6 space-y-4">
+        <div className="bg-white rounded-2xl border border-red-300 shadow-2xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
           <div className="flex items-start gap-3">
             <div className="p-2.5 bg-red-100 text-red-700 rounded-xl shrink-0">
               <AlertTriangle className="h-6 w-6" />
@@ -75,25 +188,126 @@ export function EmployeeDeletionButton({ employee, userRole }: Props) {
           </div>
 
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 font-medium" data-testid="purge-error-banner">
               {error}
             </div>
           )}
 
-          <div className="bg-red-50 p-3.5 rounded-xl border border-red-200 text-xs text-red-900 space-y-2">
-            <p className="font-bold flex items-center gap-1.5 text-red-950">
-              <AlertTriangle className="h-4 w-4 text-red-600" />
-              What will be permanently deleted:
-            </p>
-            <ul className="list-disc list-inside space-y-0.5 text-[11px] text-red-800">
-              <li>Employee Profile &amp; Demographics</li>
-              <li>Linked Salary &amp; Compensation Records</li>
-              <li>Generated Documents &amp; Version Attachments</li>
-              <li>Operational Tasks &amp; Metadata Store</li>
-            </ul>
-            <p className="text-[10.5px] text-slate-500 pt-1 border-t border-red-200/60">
-              Note: Statutory audit trail and security event logs remain permanently preserved under compliance.
-            </p>
+          {loadingDeps && (
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-500 flex items-center gap-2">
+              <span className="inline-block h-3 w-3 rounded-full border-2 border-slate-400 border-t-transparent animate-spin" />
+              Verifying database prerequisites and statutory document retention rules...
+            </div>
+          )}
+
+          {/* Condition 1: Missing database prerequisite warning (Requirement 2 & 8) */}
+          {isPrerequisiteMissing && (
+            <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-900 space-y-1.5" data-testid="tasks-prerequisite-warning">
+              <div className="font-bold flex items-center gap-1.5 text-amber-950">
+                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                <span>Database Prerequisite Missing</span>
+              </div>
+              <p className="text-[11.5px] leading-relaxed text-amber-800">
+                Employee purge is temporarily unavailable because the required Tasks database table is not installed. Contact the Super Administrator.
+              </p>
+            </div>
+          )}
+
+          {/* Condition 2: Statutory official document retention block (Requirement 8) */}
+          {isRetentionBlocked && (
+            <div className="p-3.5 bg-rose-50 border border-rose-300 rounded-xl text-xs text-rose-900 space-y-1.5" data-testid="retention-block-warning">
+              <div className="font-bold flex items-center gap-1.5 text-rose-950">
+                <ShieldAlert className="h-4 w-4 text-rose-600 shrink-0" />
+                <span>Statutory Document Retention Block</span>
+              </div>
+              <p className="text-[11.5px] leading-relaxed text-rose-800 font-semibold">
+                Permanent purge unavailable because official documents are retained for statutory/compliance purposes.
+              </p>
+              <p className="text-[11px] text-rose-700">
+                {dependencies?.blockingReason
+                  ? dependencies.blockingReason
+                  : `Employee ${employee.employee_id} has ${dependencies?.retainedDocumentsCount} official document(s) in APPROVED, FINAL, or REVOKED status. Under statutory document retention rules, official documents cannot be deleted and linked employee records cannot be physically purged.`}
+              </p>
+            </div>
+          )}
+
+          {/* Condition 3: Preflight API check failure (Requirement 7) */}
+          {isPreflightFailed && !isPrerequisiteMissing && (
+            <div className="p-3.5 bg-red-50 border border-red-300 rounded-xl text-xs text-red-900 space-y-1.5" data-testid="preflight-error-warning">
+              <div className="font-bold flex items-center gap-1.5 text-red-950">
+                <AlertTriangle className="h-4 w-4 text-red-600 shrink-0" />
+                <span>Prerequisite Verification Failed</span>
+              </div>
+              <p className="text-[11.5px] leading-relaxed text-red-800">
+                {depsError || 'Failed to verify deletion prerequisites. For safety, permanent purge is disabled.'}
+              </p>
+            </div>
+          )}
+
+          {/* Condition 4: Other general block reason */}
+          {!isPrerequisiteMissing && !isRetentionBlocked && !isPreflightFailed && isBlocked && dependencies?.blockingReason && (
+            <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-900 space-y-1.5">
+              <div className="font-bold flex items-center gap-1.5 text-amber-950">
+                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                <span>Permanent Purge Blocked</span>
+              </div>
+              <p className="text-[11.5px] leading-relaxed text-amber-800">
+                {dependencies.blockingReason}
+              </p>
+            </div>
+          )}
+
+          {/* Dependency & Schema Prerequisite Status */}
+          {dependencies && (
+            <div className="grid grid-cols-3 gap-2 text-[11px]">
+              <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                <span className="text-slate-500 block">Total Docs:</span>
+                <span className="font-bold text-slate-800">{dependencies.documentsCount}</span>
+                {dependencies.retainedDocumentsCount > 0 && (
+                  <span className="text-[10px] text-red-600 block font-semibold">({dependencies.retainedDocumentsCount} Retained)</span>
+                )}
+              </div>
+              <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                <span className="text-slate-500 block">Salary Record:</span>
+                <span className="font-bold text-slate-800">{dependencies.hasSalary ? 'Bound' : 'None'}</span>
+              </div>
+              <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                <span className="text-slate-500 block">Tasks Table:</span>
+                <span className={`font-bold ${dependencies.tasksTableAvailable ? 'text-emerald-700' : 'text-red-600'}`}>
+                  {dependencies.tasksTableAvailable ? 'Installed' : 'Missing'}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Explicit explanation of what will and will not be physically deleted */}
+          <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-2">
+            <div>
+              <p className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                What will be physically deleted:
+              </p>
+              <ul className="list-disc list-inside text-[11px] text-slate-600 mt-1 space-y-0.5">
+                <li>Employee Profile &amp; Demographics</li>
+                <li>Linked Salary &amp; Compensation Records</li>
+                <li>Unapproved Working Drafts &amp; Pending Approvals</li>
+                <li>Operational Tasks &amp; Metadata</li>
+              </ul>
+            </div>
+            <div className="pt-2 border-t border-slate-200">
+              <p className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                <ShieldCheck className="h-3.5 w-3.5 text-indigo-600" />
+                What will NOT be deleted / Legal Retention:
+              </p>
+              <ul className="list-disc list-inside text-[11px] text-slate-600 mt-1 space-y-0.5">
+                <li>
+                  <strong>Official Documents:</strong> Documents with status <span className="font-semibold text-slate-800">APPROVED</span>, <span className="font-semibold text-slate-800">FINAL</span>, or <span className="font-semibold text-slate-800">REVOKED</span> are legally protected. If any exist, employee purge is strictly blocked.
+                </li>
+                <li>
+                  <strong>Compliance History:</strong> Statutory audit trail and security event logs remain permanently preserved.
+                </li>
+              </ul>
+            </div>
           </div>
 
           <div className="space-y-1.5">
@@ -102,10 +316,23 @@ export function EmployeeDeletionButton({ employee, userRole }: Props) {
             </label>
             <input
               type="text"
+              disabled={isBlocked || isPurging}
               value={purgeConfirmation}
               onChange={(e) => setPurgeConfirmation(e.target.value)}
-              placeholder="Type DELETE"
-              className="w-full p-2.5 border border-slate-300 rounded-lg text-xs font-mono uppercase tracking-wider outline-none focus:ring-2 focus:ring-red-600"
+              placeholder={
+                loadingDeps
+                  ? 'Verifying prerequisites...'
+                  : isPrerequisiteMissing
+                  ? 'Employee purge unavailable — Tasks table not installed'
+                  : isRetentionBlocked
+                  ? 'Purge blocked — Statutory documents retained'
+                  : isPreflightFailed
+                  ? 'Purge unavailable — Prerequisite check failed'
+                  : isBlocked
+                  ? 'Purge currently unavailable'
+                  : 'Type DELETE'
+              }
+              className="w-full p-2.5 border border-slate-300 rounded-lg text-xs font-mono uppercase tracking-wider outline-none focus:ring-2 focus:ring-red-600 disabled:bg-slate-100 disabled:text-slate-400"
             />
           </div>
 
@@ -120,11 +347,13 @@ export function EmployeeDeletionButton({ employee, userRole }: Props) {
             </button>
             <button
               type="button"
-              disabled={isPurging || purgeConfirmation !== 'DELETE'}
+              disabled={isPurging || isBlocked || purgeConfirmation !== 'DELETE'}
+              aria-busy={isPurging}
               onClick={handlePurge}
-              className="px-5 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg text-xs font-bold transition shadow-xs disabled:opacity-50"
+              className="px-5 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg text-xs font-bold transition shadow-xs disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
             >
-              {isPurging ? 'Purging...' : 'Permanently Purge Record'}
+              {isPurging && <LoadingSpinner size="xs" variant="white" label="Purging..." />}
+              <span>{isPurging ? 'Purging...' : 'Permanently Purge Record'}</span>
             </button>
           </div>
         </div>
@@ -151,11 +380,7 @@ export function EmployeeDeletionButton({ employee, userRole }: Props) {
         {isSuperAdmin && !isProtected && (
           <button
             type="button"
-            onClick={() => {
-              setPurgeModalOpen(true);
-              setPurgeConfirmation('');
-              setError(null);
-            }}
+            onClick={handleOpenPurge}
             className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-red-700 hover:bg-red-800 text-white rounded-lg text-xs font-bold shadow-xs transition"
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -171,19 +396,7 @@ export function EmployeeDeletionButton({ employee, userRole }: Props) {
     setReviewModalOpen(true);
     setIsRejecting(false);
     setRejectReason('');
-    try {
-      const res = await fetch(`/api/employees/${employee.id}/deletion`);
-      if (res.ok) {
-        const data = await res.json();
-        setDependencies({
-          documentsCount: data.dependencies?.documentsCount || 0,
-          hasSalary: data.dependencies?.hasSalary || false,
-          tasksCount: data.dependencies?.tasksCount || 0,
-        });
-      }
-    } catch (err) {
-      console.error(err);
-    }
+    await fetchDependencies();
   };
 
   const handleRequestDeletion = async () => {
@@ -353,10 +566,12 @@ export function EmployeeDeletionButton({ employee, userRole }: Props) {
                     <button
                       type="button"
                       disabled={!rejectReason.trim() || loading}
+                      aria-busy={loading}
                       onClick={handleRejectDeletion}
-                      className="px-4 py-1.5 bg-red-600 text-white rounded-lg text-xs font-bold disabled:opacity-50"
+                      className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                     >
-                      Confirm Rejection
+                      {loading && <LoadingSpinner size="xs" variant="white" label="Rejecting..." />}
+                      <span>{loading ? 'Rejecting...' : 'Confirm Rejection'}</span>
                     </button>
                   </div>
                 </div>
@@ -372,18 +587,21 @@ export function EmployeeDeletionButton({ employee, userRole }: Props) {
                   <div className="flex gap-2">
                     <button
                       type="button"
+                      disabled={loading}
                       onClick={() => setReviewModalOpen(false)}
-                      className="px-4 py-2 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                      className="px-4 py-2 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
                     >
                       Cancel
                     </button>
                     <button
                       type="button"
                       disabled={loading}
+                      aria-busy={loading}
                       onClick={handleApproveDeletion}
-                      className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow-xs disabled:opacity-50"
+                      className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow-xs disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                     >
-                      Approve Deletion
+                      {loading && <LoadingSpinner size="xs" variant="white" label="Approving..." />}
+                      <span>{loading ? 'Approving...' : 'Approve Deletion'}</span>
                     </button>
                   </div>
                 </div>
@@ -409,11 +627,7 @@ export function EmployeeDeletionButton({ employee, userRole }: Props) {
       {isSuperAdmin && !isProtected && (
         <button
           type="button"
-          onClick={() => {
-            setPurgeModalOpen(true);
-            setPurgeConfirmation('');
-            setError(null);
-          }}
+          onClick={handleOpenPurge}
           className="inline-flex items-center gap-1.5 px-3 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg text-xs font-bold shadow-xs transition"
           title="Super Administrator Action: Irreversible Permanent Purge"
         >
@@ -477,10 +691,12 @@ export function EmployeeDeletionButton({ employee, userRole }: Props) {
               <button
                 type="button"
                 disabled={loading || !reason.trim()}
+                aria-busy={loading}
                 onClick={handleRequestDeletion}
-                className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition shadow-xs disabled:opacity-50"
+                className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition shadow-xs disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
               >
-                {loading ? 'Submitting...' : 'Submit Deletion Request'}
+                {loading && <LoadingSpinner size="xs" variant="white" label="Submitting..." />}
+                <span>{loading ? 'Submitting...' : 'Submit Deletion Request'}</span>
               </button>
             </div>
 

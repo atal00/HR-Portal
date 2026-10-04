@@ -2,6 +2,7 @@ import React from 'react';
 import { OfferLetterData } from '@/types/document';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { QRCodeSVG } from 'qrcode.react';
+import { DualSignatureGrid } from './AuthorizedSignatoryBlock';
 
 interface Props {
   data: OfferLetterData;
@@ -23,12 +24,18 @@ export const OfferLetterTemplate: React.FC<Props> = ({
   const stampUrl = data.stamp?.stamp_url !== undefined 
     ? data.stamp.stamp_url 
     : '/brand/varsaka-seal.png';
-  const signatoryName = data.signatory?.name || 'Authorized Signatory';
-  const signatoryTitle = data.signatory?.title || 'HR Operations / Talent Acquisition';
-  const companyName = data.signatory?.company || 'Varsaka Labs Pvt. Ltd.';
+  const signatoryName = data.signatory?.name || 'Alisha Kapoor';
+  const signatoryTitle = data.signatory?.title || 'HR Director';
+  const companyName = data.signatory?.company || 'Varsaka Labs';
+
+  const fontClass = data.fontFamily === 'typewriter'
+    ? 'font-offer-typewriter'
+    : data.fontFamily === 'old-style'
+    ? 'font-offer-old-style'
+    : 'font-offer-default';
 
   return (
-    <div className="document-inner-wrapper text-slate-900 font-sans text-[10pt] leading-relaxed">
+    <div className={`document-inner-wrapper document-clean-body text-slate-900 ${fontClass} text-[10pt] leading-relaxed`}>
       
       {/* ========================================================================= */}
       {/* PAGE 1: OFFER LETTER COVER & INTRODUCTION                                */}
@@ -165,7 +172,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
             {/* Controlled Bond Clause (Only rendered if bondIncluded is explicitly true) */}
             {data.bondIncluded === true && (
               <div className="bg-blue-50/60 border border-blue-200 p-4 rounded-md my-4">
-                <h3 className="font-bold text-blue-950 underline mb-2">
+                <h3 className="font-bold text-blue-950 mb-2">
                   Employment Bond Clause: {data.bondPeriodMonths || 24} months
                 </h3>
                 {data.bondTerms ? (
@@ -200,48 +207,17 @@ export const OfferLetterTemplate: React.FC<Props> = ({
               Again, congratulations and welcome to the Varsaka Labs family.
             </p>
 
-            <div className="pt-4">
-              <p>Thank you,</p>
-              <p className="font-bold text-blue-950">For Varsaka Labs Pvt. Ltd.</p>
-            </div>
-
             {/* Dual Signatures */}
-            <div className="pt-10 flex items-end justify-between">
-              <div className="w-64 border-t border-slate-900 pt-2 text-xs relative">
-                <div className="h-12 flex items-center gap-2 relative">
-                  {signatureUrl && (
-                    <img 
-                      src={signatureUrl} 
-                      alt="Authorized Signature" 
-                      width={100}
-                      height={40}
-                      style={{ height: '40px', width: 'auto', maxHeight: '40px' }}
-                      className="h-10 w-auto opacity-90 object-contain relative z-10" 
-                    />
-                  )}
-                  {stampUrl && (
-                    <img 
-                      src={stampUrl} 
-                      alt="Official Seal" 
-                      width={50}
-                      height={50}
-                      style={{ height: '48px', width: 'auto', maxHeight: '48px' }}
-                      className="h-12 w-auto opacity-80 object-contain ml-2" 
-                    />
-                  )}
-                </div>
-                <div className="font-bold text-blue-950 uppercase tracking-wide">{signatoryName}</div>
-                <div className="text-slate-700 font-semibold">{signatoryTitle}</div>
-                <div className="text-slate-600">{companyName}</div>
-                <div className="text-[8pt] text-slate-400 italic">(Signature & Corporate Seal)</div>
-              </div>
-
-              <div className="w-64 border-t border-slate-900 pt-2 text-xs text-right">
-                <div className="h-12"></div>
-                <div className="font-bold text-blue-950 uppercase tracking-wide">Accepted By</div>
-                <div className="text-slate-800 font-semibold">{data.candidateName}</div>
-                <div className="text-[8pt] text-slate-400 italic">(Candidate Signature & Date)</div>
-              </div>
+            <div className="pt-8">
+              <DualSignatureGrid
+                candidateName={data.candidateName}
+                signatoryName={signatoryName}
+                signatoryTitle={signatoryTitle}
+                companyName={companyName}
+                signatureUrl={signatureUrl}
+                stampUrl={stampUrl}
+                showSeal={true}
+              />
             </div>
           </div>
         </div>
@@ -269,7 +245,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
             <span className="text-xs font-mono text-slate-400">{documentNumber}</span>
           </div>
 
-          <h2 className="text-lg font-bold text-center text-blue-950 underline mb-4">
+          <h2 className="text-lg font-bold text-center text-blue-950 mb-4 tracking-wide">
             Annexure I A: Salary Structure
           </h2>
 
@@ -338,8 +314,17 @@ export const OfferLetterTemplate: React.FC<Props> = ({
                 <td className="p-2 border border-slate-300 text-right font-mono text-red-800">{formatCurrency(data.tds)}</td>
               </tr>
               <tr className="bg-emerald-50/80 font-bold text-emerald-950">
-                <td className="p-2 border border-slate-300">Monthly Net Salary (Take-home)</td>
-                <td className="p-2 border border-slate-300 text-right font-mono text-emerald-800">{formatCurrency(data.monthlyNetSalary)}</td>
+                <td className="p-2 border border-slate-300">
+                  Monthly Net Salary (Take-home)
+                  {data.netInHandMode === 'MANUAL' && (
+                    <span className="block text-[8pt] text-emerald-700 font-normal italic">
+                      (Manual override structured net)
+                    </span>
+                  )}
+                </td>
+                <td className="p-2 border border-slate-300 text-right font-mono text-emerald-800">
+                  {formatCurrency(data.finalNetInHand ?? data.monthlyNetSalary)}
+                </td>
               </tr>
               <tr>
                 <td className="p-2 border border-slate-300">Yearly Variable Component</td>
@@ -386,7 +371,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
           </div>
 
           <div className="bg-slate-50 border border-slate-200 p-4 rounded text-xs space-y-2 mb-6">
-            <h4 className="font-bold text-slate-900 underline">Important Operational Notes:</h4>
+            <h4 className="font-bold text-slate-900 mb-1">Important Operational Notes:</h4>
             <ul className="list-disc pl-5 space-y-1 text-slate-700">
               <li>Variable pay will be paid with the 13th, 14th, and 15th month payroll upon performance appraisal.</li>
               <li>Standard tax deductions like PF, professional tax, etc. will be made on the monthly gross salary.</li>
@@ -397,7 +382,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
             </ul>
           </div>
 
-          <h2 className="text-base font-bold text-blue-950 underline mb-3">
+          <h2 className="text-base font-bold text-blue-950 mb-3 tracking-wide">
             Annexure I B: Checklist of Documents to be Submitted
           </h2>
           <p className="text-xs text-slate-600 mb-4">
@@ -439,7 +424,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
       {/* ========================================================================= */}
       <div className="a4-page">
         <div>
-          <h2 className="text-base font-bold text-blue-950 underline mb-4">
+          <h2 className="text-base font-bold text-blue-950 mb-4 tracking-wide">
             Annexure II A: Terms and Conditions of Employment (Part 1)
           </h2>
           <div className="space-y-3 text-xs leading-relaxed text-justify text-slate-800">
@@ -458,7 +443,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
 
       <div className="a4-page">
         <div>
-          <h2 className="text-base font-bold text-blue-950 underline mb-4">
+          <h2 className="text-base font-bold text-blue-950 mb-4 tracking-wide">
             Annexure II A: Terms and Conditions of Employment (Part 2)
           </h2>
           <div className="space-y-3 text-xs leading-relaxed text-justify text-slate-800">
@@ -476,7 +461,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
 
       <div className="a4-page">
         <div>
-          <h2 className="text-base font-bold text-blue-950 underline mb-4">
+          <h2 className="text-base font-bold text-blue-950 mb-4 tracking-wide">
             Annexure II A: Terms and Conditions of Employment (Part 3)
           </h2>
           <div className="space-y-3 text-xs leading-relaxed text-justify text-slate-800">
@@ -501,7 +486,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
 
       <div className="a4-page">
         <div>
-          <h2 className="text-base font-bold text-blue-950 underline mb-4">
+          <h2 className="text-base font-bold text-blue-950 mb-4 tracking-wide">
             Annexure II A: Terms and Conditions of Employment (Part 4)
           </h2>
           <div className="space-y-3 text-xs leading-relaxed text-justify text-slate-800">
@@ -521,7 +506,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
 
       <div className="a4-page">
         <div>
-          <h2 className="text-base font-bold text-blue-950 underline mb-4">
+          <h2 className="text-base font-bold text-blue-950 mb-4 tracking-wide">
             Annexure II A: Terms and Conditions of Employment (Part 5 - Acceptance)
           </h2>
           <div className="space-y-4 text-xs leading-relaxed text-justify text-slate-800">
@@ -553,7 +538,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
       {/* ========================================================================= */}
       <div className="a4-page">
         <div>
-          <h2 className="text-base font-bold text-blue-950 underline mb-4">
+          <h2 className="text-base font-bold text-blue-950 mb-4 tracking-wide">
             Annexure II B: Confidentiality and Non-Disclosure Agreement (Part 1)
           </h2>
           <div className="space-y-4 text-xs leading-relaxed text-justify text-slate-800">
@@ -575,7 +560,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
 
       <div className="a4-page">
         <div>
-          <h2 className="text-base font-bold text-blue-950 underline mb-4">
+          <h2 className="text-base font-bold text-blue-950 mb-4 tracking-wide">
             Annexure II B: Confidentiality and Non-Disclosure Agreement (Part 2)
           </h2>
           <div className="space-y-4 text-xs leading-relaxed text-justify text-slate-800">
@@ -586,10 +571,10 @@ export const OfferLetterTemplate: React.FC<Props> = ({
               <p className="font-semibold text-slate-900 mb-6">
                 I have read the above agreement covering confidential information and understand my obligations to the company.
               </p>
-              <div className="space-y-3">
-                <div><strong>Signature:</strong> _________________________________________________</div>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2"><strong>Signature:</strong> <span className="border-b-2 border-slate-700 inline-block w-64 h-5"></span></div>
                 <div><strong>Full Name:</strong> <span className="font-semibold">{data.candidateName}</span></div>
-                <div><strong>Date:</strong> _________________________________________________</div>
+                <div className="flex items-center gap-2"><strong>Date:</strong> <span className="border-b-2 border-slate-700 inline-block w-48 h-5"></span></div>
               </div>
             </div>
           </div>
@@ -605,7 +590,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
       {/* ========================================================================= */}
       <div className="a4-page">
         <div>
-          <h2 className="text-base font-bold text-blue-950 underline mb-4">
+          <h2 className="text-base font-bold text-blue-950 mb-4 tracking-wide">
             Annexure II C: Work From Home Guidelines Acceptance & Agreement
           </h2>
           <div className="space-y-2 text-xs leading-relaxed text-slate-800">
@@ -629,10 +614,10 @@ export const OfferLetterTemplate: React.FC<Props> = ({
               <p className="font-semibold text-slate-900 mb-6">
                 I have read the above agreement covering the ‘Work from Home Guidelines’ of the company, and I sincerely agree to adhere to the same.
               </p>
-              <div className="space-y-3">
-                <div><strong>Signature:</strong> _________________________________________________</div>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2"><strong>Signature:</strong> <span className="border-b-2 border-slate-700 inline-block w-64 h-5"></span></div>
                 <div><strong>Full Name:</strong> <span className="font-semibold">{data.candidateName}</span></div>
-                <div><strong>Date:</strong> _________________________________________________</div>
+                <div className="flex items-center gap-2"><strong>Date:</strong> <span className="border-b-2 border-slate-700 inline-block w-48 h-5"></span></div>
               </div>
             </div>
           </div>
@@ -648,7 +633,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
       {/* ========================================================================= */}
       <div className="a4-page">
         <div>
-          <h2 className="text-base font-bold text-blue-950 underline mb-4">
+          <h2 className="text-base font-bold text-blue-950 mb-4 tracking-wide">
             Annexure II D: Social Media Guidelines and Agreement (Part 1)
           </h2>
           <div className="space-y-3 text-xs leading-relaxed text-justify text-slate-800">
@@ -665,7 +650,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
 
       <div className="a4-page">
         <div>
-          <h2 className="text-base font-bold text-blue-950 underline mb-4">
+          <h2 className="text-base font-bold text-blue-950 mb-4 tracking-wide">
             Annexure II D: Social Media Guidelines and Agreement (Part 2)
           </h2>
           <div className="space-y-3 text-xs leading-relaxed text-justify text-slate-800">
@@ -676,10 +661,10 @@ export const OfferLetterTemplate: React.FC<Props> = ({
               <p className="font-semibold text-slate-900 mb-6">
                 I have read the above agreement covering IT and Social Media Guidelines and understand my obligations.
               </p>
-              <div className="space-y-3">
-                <div><strong>Signature:</strong> _________________________________________________</div>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2"><strong>Signature:</strong> <span className="border-b-2 border-slate-700 inline-block w-64 h-5"></span></div>
                 <div><strong>Full Name:</strong> <span className="font-semibold">{data.candidateName}</span></div>
-                <div><strong>Date:</strong> _________________________________________________</div>
+                <div className="flex items-center gap-2"><strong>Date:</strong> <span className="border-b-2 border-slate-700 inline-block w-48 h-5"></span></div>
               </div>
             </div>
           </div>
@@ -707,7 +692,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
             <span className="text-xs font-mono text-slate-400">{documentNumber}</span>
           </div>
 
-          <h2 className="text-base font-bold text-center text-blue-950 underline mb-6">
+          <h2 className="text-base font-bold text-center text-blue-950 mb-6 tracking-wide">
             Annexure III A: Official Job Description - {data.designation}
           </h2>
 
@@ -757,7 +742,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
             </div>
           </div>
 
-          <h2 className="text-base font-bold text-center text-blue-950 underline mb-4">
+          <h2 className="text-base font-bold text-center text-blue-950 mb-4 tracking-wide">
             Annexure III B: Performance Measurement Agreement
           </h2>
 
@@ -800,17 +785,17 @@ export const OfferLetterTemplate: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* Final Signatures */}
-          <div className="mt-8 border-t border-slate-300 pt-4 text-xs space-y-2">
-            <div className="flex justify-between items-end">
-              <div>
-                <div><strong>Accepted Candidate Signature:</strong> ___________________________</div>
-                <div className="mt-1"><strong>Full Name:</strong> <span className="font-semibold">{data.candidateName}</span></div>
-              </div>
-              <div>
-                <div><strong>Date:</strong> ___________________________</div>
-              </div>
-            </div>
+          {/* Final Signatures: Clean Shared Two-Column Grid */}
+          <div className="mt-5 pt-2">
+            <DualSignatureGrid
+              candidateName={data.candidateName}
+              signatoryName={signatoryName}
+              signatoryTitle={signatoryTitle}
+              companyName={companyName}
+              signatureUrl={signatureUrl}
+              stampUrl={stampUrl}
+              showSeal={true}
+            />
           </div>
         </div>
 
