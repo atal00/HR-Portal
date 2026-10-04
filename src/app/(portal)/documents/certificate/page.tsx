@@ -199,12 +199,12 @@ export default function CertificateAccessPage() {
               Are you sure you want to send a certificate-generation access request to the administrator?
             </div>
 
-            <div className="flex justify-end gap-2.5 pt-2">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5 pt-2">
               <button
                 type="button"
                 disabled={submitting}
                 onClick={() => setModalOpen(false)}
-                className="px-4 py-2 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+                className="w-full sm:w-auto px-4 py-2 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 transition text-center"
               >
                 Cancel
               </button>
@@ -213,7 +213,7 @@ export default function CertificateAccessPage() {
                 disabled={submitting}
                 aria-busy={submitting}
                 onClick={handleSendRequest}
-                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition shadow-xs disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                className="w-full sm:w-auto px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition shadow-xs disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 {submitting ? (
                   <>

@@ -48,12 +48,12 @@ export const Breadcrumb: React.FC = () => {
   });
 
   return (
-    <nav aria-label="Breadcrumb" className="flex items-center space-x-2 text-xs text-slate-500 py-1">
+    <nav aria-label="Breadcrumb" className="flex items-center space-x-2 text-xs text-slate-500 py-1 overflow-x-auto pb-1 max-w-full scrollbar-none whitespace-nowrap">
       <Link
         href="/dashboard"
-        className="flex items-center gap-1.5 hover:text-blue-600 transition font-medium cursor-pointer"
+        className="flex items-center gap-1.5 hover:text-blue-600 transition font-medium cursor-pointer shrink-0"
       >
-        <Home className="h-3.5 w-3.5" />
+        <Home className="h-3.5 w-3.5 shrink-0" />
         <span>Varsaka HR</span>
       </Link>
 

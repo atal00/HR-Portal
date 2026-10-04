@@ -506,7 +506,7 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
       {/* Users Table */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full min-w-[700px] text-left text-xs">
             <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
               <tr>
                 <th className="px-5 py-3">User & Email</th>
@@ -821,12 +821,12 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
                 The user account is securely initialized through the Supabase Authentication layer. No passwords are exposed or manually configured.
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   disabled={loading}
                   onClick={() => setAddUserModalOpen(false)}
-                  className="px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  className="w-full sm:w-auto px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 text-center"
                 >
                   Cancel
                 </button>
@@ -835,7 +835,7 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
                   disabled={loading}
                   aria-busy={loading && userActionType === 'ADD_USER'}
                   aria-disabled={loading}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold disabled:opacity-50 inline-flex items-center gap-2"
+                  className="w-full sm:w-auto px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold disabled:opacity-50 inline-flex items-center justify-center gap-2"
                 >
                   {loading && userActionType === 'ADD_USER' && <LoadingSpinner size="xs" variant="white" />}
                   <span>{loading && userActionType === 'ADD_USER' ? 'Creating User...' : 'Create System User'}</span>
@@ -872,12 +872,12 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
               </select>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2 border-t border-slate-100">
               <button
                 type="button"
                 disabled={loading}
                 onClick={() => setEditRoleModalUser(null)}
-                className="px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700 disabled:opacity-50"
+                className="w-full sm:w-auto px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700 disabled:opacity-50 text-center"
               >
                 Cancel
               </button>
@@ -887,7 +887,7 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
                 aria-busy={loading && userActionType === 'EDIT_ROLE'}
                 aria-disabled={loading}
                 onClick={handleUpdateRole}
-                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold disabled:opacity-50 inline-flex items-center gap-2"
+                className="w-full sm:w-auto px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold disabled:opacity-50 inline-flex items-center justify-center gap-2"
               >
                 {loading && userActionType === 'EDIT_ROLE' && <LoadingSpinner size="xs" variant="white" />}
                 <span>{loading && userActionType === 'EDIT_ROLE' ? 'Saving Role...' : 'Save Role'}</span>
@@ -919,12 +919,12 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
               />
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2 border-t border-slate-100">
               <button
                 type="button"
                 disabled={loading}
                 onClick={() => setEditDeptModalUser(null)}
-                className="px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700 disabled:opacity-50"
+                className="w-full sm:w-auto px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700 disabled:opacity-50 text-center"
               >
                 Cancel
               </button>
@@ -934,7 +934,7 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
                 aria-busy={loading && userActionType === 'EDIT_DEPT'}
                 aria-disabled={loading || !targetDept.trim()}
                 onClick={handleUpdateDept}
-                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold disabled:opacity-50 inline-flex items-center gap-2"
+                className="w-full sm:w-auto px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold disabled:opacity-50 inline-flex items-center justify-center gap-2"
               >
                 {loading && userActionType === 'EDIT_DEPT' && <LoadingSpinner size="xs" variant="white" />}
                 <span>{loading && userActionType === 'EDIT_DEPT' ? 'Saving Department...' : 'Save Department'}</span>
@@ -975,12 +975,12 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
               />
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2 border-t border-slate-100">
               <button
                 type="button"
                 disabled={loading}
                 onClick={() => setDeactivateModalUser(null)}
-                className="px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700 disabled:opacity-50"
+                className="w-full sm:w-auto px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700 disabled:opacity-50 text-center"
               >
                 Cancel
               </button>
@@ -990,7 +990,7 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
                 aria-busy={loading && userActionType === 'DEACTIVATE'}
                 aria-disabled={loading || !deactivationReason.trim()}
                 onClick={handleConfirmDeactivate}
-                className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold disabled:opacity-50 inline-flex items-center gap-2"
+                className="w-full sm:w-auto px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold disabled:opacity-50 inline-flex items-center justify-center gap-2"
               >
                 {loading && userActionType === 'DEACTIVATE' && <LoadingSpinner size="xs" variant="white" />}
                 <span>{loading && userActionType === 'DEACTIVATE' ? 'Deactivating...' : 'Confirm Deactivation'}</span>
@@ -1035,12 +1035,12 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
               />
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2 border-t border-slate-100">
               <button
                 type="button"
                 disabled={loading}
                 onClick={() => setDeleteModalUser(null)}
-                className="px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700 disabled:opacity-50"
+                className="w-full sm:w-auto px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700 disabled:opacity-50 text-center"
               >
                 Cancel
               </button>
@@ -1050,7 +1050,7 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
                 aria-busy={loading && userActionType === 'DELETE'}
                 aria-disabled={loading || !deleteReason.trim()}
                 onClick={handleConfirmDelete}
-                className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold disabled:opacity-50 inline-flex items-center gap-2"
+                className="w-full sm:w-auto px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold disabled:opacity-50 inline-flex items-center justify-center gap-2"
               >
                 {loading && userActionType === 'DELETE' && <LoadingSpinner size="xs" variant="white" />}
                 <span>{loading && userActionType === 'DELETE' ? 'Deleting...' : 'Confirm Delete'}</span>
@@ -1065,22 +1065,22 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
       {/* ========================================================================= */}
       {permissionModalUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full p-6 space-y-4 max-h-[90vh] flex flex-col">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full p-4 sm:p-6 space-y-4 max-h-[90vh] flex flex-col">
             
-            <div className="flex items-start justify-between border-b pb-3 border-slate-100">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <Key className="h-5 w-5 text-blue-600" />
-                  Granular Permission Management: {permissionModalUser.full_name}
+            <div className="flex items-start justify-between gap-2 border-b pb-3 border-slate-100">
+              <div className="min-w-0">
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Key className="h-5 w-5 text-blue-600 shrink-0" />
+                  <span className="truncate">Granular Permission: {permissionModalUser.full_name}</span>
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-slate-500 mt-0.5 truncate">
                   Assigned Role: <span className="font-bold text-slate-800">{permissionModalUser.role}</span> • Department: <span className="font-bold text-slate-800">{permissionModalUser.department || 'General'}</span>
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setPermissionModalUser(null)}
-                className="px-3 py-1.5 border rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                className="px-3 py-1.5 border rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50 shrink-0"
               >
                 Close
               </button>
@@ -1092,8 +1092,9 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
                   <InlineLoader text="Loading server-side permission records..." size="md" />
                 </div>
               ) : (
-                <table className="w-full text-left text-xs border border-slate-200 rounded-lg">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[10px] sticky top-0">
+                <div className="overflow-x-auto border border-slate-200 rounded-lg">
+                  <table className="w-full min-w-[620px] text-left text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[10px] sticky top-0">
                     <tr>
                       <th className="px-4 py-2.5">Permission Code</th>
                       <th className="px-4 py-2.5">Description</th>
@@ -1221,15 +1222,16 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
                     })}
                   </tbody>
                 </table>
+              </div>
               )}
             </div>
 
-            <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-[11px] text-slate-500">
+            <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 text-[11px] text-slate-500">
               <span>All permission grants and revocations are evaluated server-side and recorded in the audit log.</span>
               <button
                 type="button"
                 onClick={() => setPermissionModalUser(null)}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold"
+                className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold text-center"
               >
                 Done
               </button>
@@ -1294,12 +1296,12 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
               Removing this override will delete the explicit user-level override and immediately restore the user&apos;s inherited role default.
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2 border-t border-slate-100">
               <button
                 type="button"
                 disabled={overrideActionLoading}
                 onClick={() => setRemoveConfirmModal(null)}
-                className="px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                className="w-full sm:w-auto px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 transition text-center"
               >
                 Cancel
               </button>
@@ -1309,7 +1311,7 @@ export function UserManagementView({ initialUsers, currentUserRole, currentUserI
                 aria-busy={overrideActionLoading}
                 aria-disabled={overrideActionLoading}
                 onClick={handleConfirmRemoveOverride}
-                className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                className="w-full sm:w-auto px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-50"
               >
                 {overrideActionLoading ? <LoadingSpinner size="xs" variant="white" /> : <RotateCcw className="h-3.5 w-3.5" />}
                 <span>{overrideActionLoading ? 'Removing...' : 'Remove Override'}</span>

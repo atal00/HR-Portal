@@ -507,7 +507,7 @@ export default function SettingsPage() {
               </div>
 
               {/* Action Toolbar */}
-              <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-100">
                 <span className="text-[11px] text-slate-500 flex items-center gap-1">
                   <Clock className="h-3.5 w-3.5" />
                   All configuration updates are permanently audit logged.
@@ -518,7 +518,7 @@ export default function SettingsPage() {
                   disabled={saving}
                   aria-busy={saving}
                   aria-disabled={saving}
-                  className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition shadow-xs disabled:opacity-50"
+                  className="w-full sm:w-auto justify-center inline-flex items-center gap-1.5 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition shadow-xs disabled:opacity-50 cursor-pointer"
                 >
                   {saving ? <LoadingSpinner size="xs" variant="white" /> : <RefreshCw className="h-3.5 w-3.5" />}
                   <span>{saving ? 'Saving Branding Metadata...' : 'Save Branding Metadata'}</span>
@@ -759,7 +759,7 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Corporate Website *</label>
                   <input
@@ -803,12 +803,12 @@ export default function SettingsPage() {
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   disabled={savingMeta}
                   onClick={() => setEditMetaModalOpen(false)}
-                  className="px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  className="w-full sm:w-auto px-4 py-2 border rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 text-center"
                 >
                   Cancel
                 </button>
@@ -817,7 +817,7 @@ export default function SettingsPage() {
                   disabled={savingMeta}
                   aria-busy={savingMeta}
                   aria-disabled={savingMeta}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold disabled:opacity-50 inline-flex items-center gap-2"
+                  className="w-full sm:w-auto justify-center px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold disabled:opacity-50 inline-flex items-center gap-2 cursor-pointer"
                 >
                   {savingMeta && <LoadingSpinner size="xs" variant="white" />}
                   <span>{savingMeta ? 'Saving Corporate Metadata...' : 'Save Corporate Metadata'}</span>

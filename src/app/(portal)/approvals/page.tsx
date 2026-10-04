@@ -398,15 +398,15 @@ export default function ApprovalsPage() {
         </div>
 
         {/* Bulk Action Controls */}
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold text-slate-500">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
+          <span className="text-xs font-semibold text-slate-500 w-full sm:w-auto">
             Selected: <strong className="text-slate-900 font-mono text-sm">{selectedIds.length}</strong>
           </span>
 
           <button
             onClick={() => setBulkApproveModalOpen(true)}
             disabled={selectedIds.length === 0 || isSubmitting}
-            className="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
+            className="w-full sm:w-auto justify-center px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
           >
             <CheckCircle2 className="h-4 w-4" />
             <span>Approve Selected</span>
@@ -415,7 +415,7 @@ export default function ApprovalsPage() {
           <button
             onClick={handleOpenRejectBulk}
             disabled={selectedIds.length === 0 || isSubmitting}
-            className="px-3.5 py-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold border border-amber-200 text-xs transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
+            className="w-full sm:w-auto justify-center px-3.5 py-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold border border-amber-200 text-xs transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
           >
             <XCircle className="h-4 w-4" />
             <span>Reject Selected</span>
@@ -425,7 +425,7 @@ export default function ApprovalsPage() {
             <button
               onClick={handleOpenDeleteBulk}
               disabled={selectedIds.length === 0 || isSubmitting}
-              className="px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition shadow-xs disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
+              className="w-full sm:w-auto justify-center px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition shadow-xs disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
             >
               <Trash2 className="h-4 w-4" />
               <span>Delete Selected</span>
@@ -451,7 +451,7 @@ export default function ApprovalsPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full min-w-[760px] text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
                 <tr>
                   <th className="px-4 py-3 w-10 text-center">
@@ -657,19 +657,19 @@ export default function ApprovalsPage() {
                 )}
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setRejectModalOpen(false)}
                   disabled={isSubmitting}
-                  className="px-3.5 py-2 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-50 transition"
+                  className="w-full sm:w-auto px-4 py-2 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-50 transition text-center"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-sm transition disabled:opacity-50 cursor-pointer"
+                  className="w-full sm:w-auto px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-sm transition disabled:opacity-50 cursor-pointer text-center"
                 >
                   {isSubmitting ? 'Rejecting...' : `Reject ${isBulkReject ? `${selectedIds.length} Documents` : 'Document'}`}
                 </button>
@@ -721,12 +721,12 @@ export default function ApprovalsPage() {
               ))}
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2 border-t border-slate-100">
               <button
                 type="button"
                 onClick={() => setBulkApproveModalOpen(false)}
                 disabled={isSubmitting}
-                className="px-3.5 py-2 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-50 transition"
+                className="w-full sm:w-auto px-4 py-2 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-50 transition text-center"
               >
                 Cancel
               </button>
@@ -734,7 +734,7 @@ export default function ApprovalsPage() {
                 type="button"
                 onClick={handleConfirmBulkApprove}
                 disabled={isSubmitting}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition disabled:opacity-50 cursor-pointer"
+                className="w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition disabled:opacity-50 cursor-pointer text-center"
               >
                 {isSubmitting ? 'Approving...' : `Approve ${selectedIds.length} Documents`}
               </button>
@@ -814,19 +814,19 @@ export default function ApprovalsPage() {
                 )}
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setDeleteModalOpen(false)}
                   disabled={isSubmitting}
-                  className="px-3.5 py-2 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-50 transition"
+                  className="w-full sm:w-auto px-4 py-2 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-50 transition text-center"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting || !deleteReason.trim()}
-                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-sm transition disabled:opacity-50 cursor-pointer"
+                  className="w-full sm:w-auto px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-sm transition disabled:opacity-50 cursor-pointer text-center"
                 >
                   {isSubmitting ? 'Deleting...' : `Delete ${selectedIds.length} Documents`}
                 </button>

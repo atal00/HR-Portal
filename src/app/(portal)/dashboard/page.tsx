@@ -283,10 +283,10 @@ export default async function DashboardPage() {
               const isPending = doc.status === 'PENDING_APPROVAL';
 
               return (
-                <div key={doc.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900">{doc.title}</span>
+                <div key={doc.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50 transition">
+                  <div className="space-y-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-slate-900 break-words">{doc.title}</span>
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
                         isApproved ? 'bg-emerald-100 text-emerald-800' :
                         isRevoked ? 'bg-red-100 text-red-800' :
@@ -295,16 +295,16 @@ export default async function DashboardPage() {
                         {doc.status}
                       </span>
                     </div>
-                    <div className="flex items-center gap-3 text-slate-500">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-slate-500">
                       <span>Recipient: <strong className="text-slate-700">{doc.employee_name}</strong></span>
-                      <span>•</span>
-                      <span className="font-mono">{doc.document_number}</span>
-                      <span>•</span>
+                      <span className="hidden sm:inline">•</span>
+                      <span className="font-mono text-xs">{doc.document_number}</span>
+                      <span className="hidden sm:inline">•</span>
                       <span>{formatDate(doc.issue_date)}</span>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
                     <Link
                       href={`/documents/${doc.id}`}
                       className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 font-semibold hover:bg-slate-100 transition"

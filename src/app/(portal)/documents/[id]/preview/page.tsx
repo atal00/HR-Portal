@@ -94,31 +94,31 @@ export default function DocumentPreviewPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between no-print bg-white p-4 rounded-xl border border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 no-print bg-white p-4 rounded-xl border border-slate-200">
         <div className="flex items-center gap-3">
           <Link
             href={`/documents/${doc.id}`}
-            className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition"
+            className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition shrink-0"
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
-          <div>
-            <h1 className="font-bold text-slate-900 text-sm">{doc.title}</h1>
-            <p className="text-[11px] text-slate-500">Document Number: {doc.document_number}</p>
+          <div className="min-w-0">
+            <h1 className="font-bold text-slate-900 text-sm truncate">{doc.title}</h1>
+            <p className="text-[11px] text-slate-500 font-mono">Document Number: {doc.document_number}</p>
           </div>
         </div>
 
         <button
           onClick={() => window.print()}
-          className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition shadow-xs"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer shrink-0"
         >
           <Printer className="h-4 w-4" />
           <span>Print / Save as PDF</span>
         </button>
       </div>
 
-      <div className="document-outer-container bg-slate-200/90 p-4 md:p-8 rounded-xl border border-slate-300 flex justify-center">
-        <div className="w-full">
+      <div className="document-outer-container bg-slate-200/90 p-2 sm:p-4 md:p-8 rounded-xl border border-slate-300 flex justify-start md:justify-center overflow-x-auto">
+        <div className="min-w-[794px] shrink-0">
           {renderTemplate()}
         </div>
       </div>

@@ -1134,11 +1134,11 @@ export default function GenerateOfferLetterPage() {
           </div>
 
           {/* Submit Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5 sm:gap-3 pt-4 border-t border-slate-200">
             <button
               type="button"
               onClick={() => setActiveTab('preview')}
-              className="px-4 py-2.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition flex items-center gap-1.5"
+              className="w-full sm:w-auto justify-center px-4 py-2.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition flex items-center gap-1.5"
             >
               <Eye className="h-4 w-4" />
               Preview Document
@@ -1147,7 +1147,7 @@ export default function GenerateOfferLetterPage() {
               type="submit"
               disabled={generating}
               aria-busy={generating}
-              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-xs font-bold transition shadow-sm disabled:opacity-50 select-none cursor-pointer"
+              className="w-full sm:w-auto justify-center inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-xs font-bold transition shadow-sm disabled:opacity-50 select-none cursor-pointer"
             >
               {generating ? (
                 <>
@@ -1166,25 +1166,27 @@ export default function GenerateOfferLetterPage() {
         </form>
       ) : (
         <div className="space-y-4">
-          <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 bg-white p-4 rounded-xl border border-slate-200">
             <span className="text-xs text-slate-600">
               Live Preview of official offer letter contract with dynamic clauses and bond configurations.
             </span>
             <button
               onClick={() => setActiveTab('form')}
-              className="px-4 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700"
+              className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 text-center"
             >
               Back to Form
             </button>
           </div>
 
-          <div className="border border-slate-300 rounded-xl overflow-hidden p-4 bg-slate-200">
-            <OfferLetterTemplate
-              data={formValues}
-              documentNumber="VAR-OFF-PREVIEW"
-              verificationId="VVR-OFF-PREVIEW"
-              verificationUrl={`${verificationBase}/verify/VVR-OFF-PREVIEW`}
-            />
+          <div className="border border-slate-300 rounded-xl overflow-x-auto p-2 sm:p-4 bg-slate-200 flex justify-start md:justify-center">
+            <div className="min-w-[794px] shrink-0">
+              <OfferLetterTemplate
+                data={formValues}
+                documentNumber="VAR-OFF-PREVIEW"
+                verificationId="VVR-OFF-PREVIEW"
+                verificationUrl={`${verificationBase}/verify/VVR-OFF-PREVIEW`}
+              />
+            </div>
           </div>
         </div>
       )}

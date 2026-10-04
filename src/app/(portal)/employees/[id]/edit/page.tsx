@@ -1283,17 +1283,17 @@ export default function EditEmployeePage() {
         )}
 
         {/* Bottom Save Bar */}
-        <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-2 text-xs text-slate-500">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
             <span>Section <strong>{activeSection}</strong> of 5</span>
             <span className="text-slate-300">|</span>
-            <span>Employee ID: <strong className="font-mono text-blue-800">{formData.employee_id}</strong></span>
+            <span className="break-all">Employee ID: <strong className="font-mono text-blue-800">{formData.employee_id}</strong></span>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-end gap-3 w-full sm:w-auto">
             <Link
               href={`/employees/${id}`}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition"
+              className="flex-1 sm:flex-none text-center px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition"
             >
               Cancel
             </Link>
@@ -1301,7 +1301,7 @@ export default function EditEmployeePage() {
               type="submit"
               disabled={submitting}
               aria-busy={submitting}
-              className={`px-5 py-2.5 rounded-lg text-xs font-bold text-white transition flex items-center gap-2 select-none ${
+              className={`flex-1 sm:flex-none justify-center px-5 py-2.5 rounded-lg text-xs font-bold text-white transition flex items-center gap-2 select-none ${
                 submitting
                   ? 'bg-blue-400 cursor-not-allowed opacity-80'
                   : 'bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-600/20 cursor-pointer'
@@ -1358,12 +1358,12 @@ export default function EditEmployeePage() {
               </p>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2">
+            <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 pt-2">
               <button
                 type="button"
                 disabled={submitting}
                 onClick={() => setShowIdConfirmModal(false)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold disabled:opacity-50"
+                className="w-full sm:w-auto px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold disabled:opacity-50 text-center"
               >
                 Cancel
               </button>
@@ -1372,7 +1372,7 @@ export default function EditEmployeePage() {
                 disabled={submitting}
                 aria-busy={submitting}
                 onClick={executeSave}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5"
+                className="w-full sm:w-auto px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold shadow-xs flex items-center justify-center gap-1.5"
               >
                 {submitting && <LoadingSpinner size="xs" variant="white" label="Updating..." />}
                 <span>{submitting ? 'Updating...' : 'Confirm & Update ID'}</span>

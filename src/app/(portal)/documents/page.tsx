@@ -544,12 +544,12 @@ export default function DocumentsPage() {
           )}
         </div>
 
-        <div className="flex items-center flex-wrap gap-2.5">
+        <div className="flex items-center flex-wrap gap-2 sm:gap-2.5 w-full sm:w-auto">
           <button
             type="button"
             onClick={() => setBulkApproveModalOpen(true)}
             disabled={selectedIds.length === 0 || isBulkSubmitting}
-            className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
+            className="w-full sm:w-auto justify-center px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
           >
             <CheckCircle2 className="h-3.5 w-3.5" />
             <span>Approve Selected</span>
@@ -563,7 +563,7 @@ export default function DocumentsPage() {
               setBulkRevokeModalOpen(true);
             }}
             disabled={selectedIds.length === 0 || isBulkSubmitting}
-            className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition shadow-xs disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
+            className="w-full sm:w-auto justify-center px-3.5 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition shadow-xs disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
           >
             <AlertTriangle className="h-3.5 w-3.5" />
             <span>Revoke Selected</span>
@@ -577,7 +577,7 @@ export default function DocumentsPage() {
               setBulkDeleteModalOpen(true);
             }}
             disabled={selectedIds.length === 0 || isBulkSubmitting}
-            className="px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition shadow-xs disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
+            className="w-full sm:w-auto justify-center px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition shadow-xs disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
           >
             <Trash2 className="h-3.5 w-3.5" />
             <span>Delete Selected</span>
@@ -607,7 +607,7 @@ export default function DocumentsPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full min-w-[760px] text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
                 <tr>
                   <th className="px-4 py-3 w-10 text-center">
@@ -894,12 +894,12 @@ export default function DocumentsPage() {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-2.5 pt-2">
+              <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => setDeleteTarget(null)}
                   disabled={isDeleting}
-                  className="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-xs font-semibold text-slate-700 transition"
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-xs font-semibold text-slate-700 transition text-center"
                 >
                   Cancel
                 </button>
@@ -907,7 +907,7 @@ export default function DocumentsPage() {
                   <button
                     type="button"
                     disabled={true}
-                    className="px-4 py-2 rounded-xl bg-slate-200 text-slate-500 text-xs font-bold cursor-not-allowed flex items-center gap-1.5 shadow-2xs"
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-200 text-slate-500 text-xs font-bold cursor-not-allowed flex items-center justify-center gap-1.5 shadow-2xs"
                   >
                     Cannot Delete (Protected)
                   </button>
@@ -916,7 +916,7 @@ export default function DocumentsPage() {
                     type="submit"
                     disabled={isDeleting || !deleteReason.trim()}
                     aria-busy={isDeleting}
-                    className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    className="w-full sm:w-auto justify-center px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer text-center"
                   >
                     {isDeleting ? (
                       <>
@@ -984,12 +984,12 @@ export default function DocumentsPage() {
               ))}
             </div>
 
-            <div className="flex items-center justify-end gap-2.5 pt-2">
+            <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-2.5 pt-2">
               <button
                 type="button"
                 onClick={() => setBulkApproveModalOpen(false)}
                 disabled={isBulkSubmitting}
-                className="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-xs font-semibold text-slate-700 transition"
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-xs font-semibold text-slate-700 transition text-center"
               >
                 Cancel
               </button>
@@ -998,7 +998,7 @@ export default function DocumentsPage() {
                 onClick={handleBulkApproveSubmit}
                 disabled={isBulkSubmitting}
                 aria-busy={isBulkSubmitting}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                className="w-full sm:w-auto justify-center px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
               >
                 {isBulkSubmitting ? (
                   <>
@@ -1093,12 +1093,12 @@ export default function DocumentsPage() {
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2.5 pt-2">
+              <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => setBulkRevokeModalOpen(false)}
                   disabled={isBulkSubmitting}
-                  className="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-xs font-semibold text-slate-700 transition"
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-xs font-semibold text-slate-700 transition text-center"
                 >
                   Cancel
                 </button>
@@ -1106,7 +1106,7 @@ export default function DocumentsPage() {
                   type="submit"
                   disabled={isBulkSubmitting || bulkRevokeReason.trim().length < 5}
                   aria-busy={isBulkSubmitting}
-                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                  className="w-full sm:w-auto justify-center px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
                 >
                   {isBulkSubmitting ? (
                     <>
@@ -1246,12 +1246,12 @@ export default function DocumentsPage() {
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2.5 pt-2">
+              <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => setBulkDeleteModalOpen(false)}
                   disabled={isBulkSubmitting}
-                  className="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-xs font-semibold text-slate-700 transition"
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-xs font-semibold text-slate-700 transition text-center"
                 >
                   Cancel
                 </button>
@@ -1259,7 +1259,7 @@ export default function DocumentsPage() {
                   <button
                     type="button"
                     disabled={true}
-                    className="px-4 py-2 rounded-xl bg-slate-200 text-slate-500 text-xs font-bold cursor-not-allowed flex items-center gap-1.5 shadow-2xs"
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-200 text-slate-500 text-xs font-bold cursor-not-allowed flex items-center justify-center gap-1.5 shadow-2xs"
                   >
                     Cannot Delete ({protectedSelectedDocs.length} Protected)
                   </button>
@@ -1268,7 +1268,7 @@ export default function DocumentsPage() {
                     type="submit"
                     disabled={isBulkSubmitting || !bulkDeleteReason.trim()}
                     aria-busy={isBulkSubmitting}
-                    className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    className="w-full sm:w-auto justify-center px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
                   >
                     {isBulkSubmitting ? (
                       <>

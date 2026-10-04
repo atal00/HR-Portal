@@ -1341,18 +1341,18 @@ export default function NewEmployeePage() {
         )}
 
         {/* Bottom Wizard Navigation Action Bar */}
-        <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-2 text-xs text-slate-500">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
             <span>Step <strong>{activeSection === 'A' ? 1 : activeSection === 'B' ? 2 : activeSection === 'C' ? 3 : 4}</strong> of 4</span>
             <span className="text-slate-300">|</span>
-            <span>Target Employee ID: <strong className="font-mono text-blue-800">{watchEmpId}</strong></span>
+            <span className="break-all">Target Employee ID: <strong className="font-mono text-blue-800">{watchEmpId}</strong></span>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-end gap-3 w-full sm:w-auto">
             {activeSection === 'A' ? (
               <Link
                 href="/employees"
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition"
+                className="flex-1 sm:flex-none text-center px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition"
               >
                 Cancel
               </Link>
@@ -1360,7 +1360,7 @@ export default function NewEmployeePage() {
               <button
                 type="button"
                 onClick={() => handleBack(activeSection as 'B' | 'C' | 'D')}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition flex items-center gap-1 cursor-pointer"
+                className="flex-1 sm:flex-none justify-center px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition flex items-center gap-1 cursor-pointer"
               >
                 <ChevronLeft className="h-4 w-4" />
                 Back
@@ -1371,7 +1371,7 @@ export default function NewEmployeePage() {
               <button
                 type="button"
                 onClick={() => handleNext(activeSection as 'A' | 'B' | 'C')}
-                className="px-5 py-2.5 rounded-lg text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-600/20 transition flex items-center gap-1.5 cursor-pointer"
+                className="flex-1 sm:flex-none justify-center px-5 py-2.5 rounded-lg text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-600/20 transition flex items-center gap-1.5 cursor-pointer"
               >
                 <span>Next</span>
                 <ChevronRight className="h-4 w-4" />
@@ -1381,7 +1381,7 @@ export default function NewEmployeePage() {
                 type="submit"
                 disabled={submitting}
                 aria-busy={submitting}
-                className={`px-5 py-2.5 rounded-lg text-xs font-bold text-white transition flex items-center gap-2 select-none ${
+                className={`flex-1 sm:flex-none justify-center px-5 py-2.5 rounded-lg text-xs font-bold text-white transition flex items-center gap-2 select-none ${
                   submitting
                     ? 'bg-emerald-500 cursor-not-allowed opacity-80'
                     : 'bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20 cursor-pointer'

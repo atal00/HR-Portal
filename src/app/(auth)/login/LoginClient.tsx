@@ -212,27 +212,27 @@ export default function LoginClient({ initialReason }: LoginClientProps = {}) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-3 sm:p-6 lg:p-8">
       <div className="w-full max-w-md mx-auto space-y-6">
         
         {/* Brand Header */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center gap-3">
-            <div className="h-12 w-12 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-center p-1.5 shrink-0 overflow-hidden">
+          <div className="inline-flex items-center justify-center gap-2.5 max-w-full">
+            <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-center p-1.5 shrink-0 overflow-hidden">
               <img 
                 src="/brand/varsaka-logo.png" 
                 alt="Varsaka Labs Logo" 
                 width={40}
                 height={40}
                 style={{ height: '36px', width: '36px', objectFit: 'contain' }}
-                className="h-9 w-9 object-contain" 
+                className="h-8 w-8 sm:h-9 sm:w-9 object-contain" 
               />
             </div>
-            <div className="text-left">
-              <span className="text-2xl font-black text-slate-900 tracking-tight block leading-tight">
+            <div className="text-left min-w-0">
+              <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight block leading-tight">
                 VARSAKA LABS
               </span>
-              <span className="text-[10px] text-blue-600 font-bold uppercase tracking-widest block">
+              <span className="text-[9.5px] sm:text-[10px] text-blue-600 font-bold uppercase tracking-widest block truncate">
                 HR Document &amp; Verification Portal
               </span>
             </div>
@@ -243,7 +243,7 @@ export default function LoginClient({ initialReason }: LoginClientProps = {}) {
         </div>
 
         {/* Card */}
-        <div className="bg-white py-8 px-6 sm:px-8 shadow-xl shadow-slate-200/50 rounded-2xl border border-slate-200">
+        <div className="bg-white py-6 px-4 sm:py-8 sm:px-8 shadow-xl shadow-slate-200/50 rounded-2xl border border-slate-200">
           {sessionExpiredNotice && (
             <div className="mb-6 p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2.5 shadow-2xs">
               <Clock className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />

@@ -180,7 +180,7 @@ export const TemplatesView: React.FC<Props> = ({ templates }) => {
             <div className="px-6 py-3.5 border-t border-slate-200 bg-slate-50 flex justify-end">
               <button
                 onClick={() => setSelectedTemplate(null)}
-                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition cursor-pointer shadow-xs"
+                className="w-full sm:w-auto px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition cursor-pointer shadow-xs text-center"
               >
                 Close Schema
               </button>

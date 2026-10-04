@@ -350,7 +350,7 @@ export const SecurityTelemetryView: React.FC<Props> = ({ logs }) => {
 
         {/* Security Event Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+          <table className="w-full min-w-[800px] text-left text-xs border-collapse">
             <thead className="bg-slate-50/90 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
               <tr>
                 <th className="px-5 py-3">Timestamp</th>
@@ -515,7 +515,7 @@ export const SecurityTelemetryView: React.FC<Props> = ({ logs }) => {
             <div className="px-6 py-3.5 border-t border-slate-200 bg-slate-50 flex items-center justify-end">
               <button
                 onClick={() => setSelectedLog(null)}
-                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition cursor-pointer shadow-xs"
+                className="w-full sm:w-auto px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition cursor-pointer shadow-xs text-center"
               >
                 Close Diagnostic View
               </button>

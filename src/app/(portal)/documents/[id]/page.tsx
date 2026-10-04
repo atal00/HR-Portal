@@ -413,8 +413,8 @@ export default function DocumentDetailsPage() {
       )}
 
       {/* Document Render Container */}
-      <div className="document-outer-container bg-slate-200/80 p-4 md:p-8 rounded-xl border border-slate-300 shadow-inner flex justify-center overflow-x-auto">
-        <div className="w-full">
+      <div className="document-outer-container bg-slate-200/80 p-2 sm:p-4 md:p-8 rounded-xl border border-slate-300 shadow-inner flex justify-start md:justify-center overflow-x-auto">
+        <div className="min-w-[794px] shrink-0">
           {renderTemplate()}
         </div>
       </div>
@@ -445,11 +445,11 @@ export default function DocumentDetailsPage() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2 border-t border-slate-100">
               <button
                 type="button"
                 onClick={() => setShowApproveModal(false)}
-                className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-semibold transition cursor-pointer"
+                className="w-full sm:w-auto px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-semibold transition cursor-pointer text-center"
               >
                 Cancel
               </button>
@@ -458,7 +458,7 @@ export default function DocumentDetailsPage() {
                 onClick={handleApprove}
                 disabled={actionLoading}
                 aria-busy={actionLoading}
-                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                className="w-full sm:w-auto px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold transition disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
               >
                 {actionLoading && <LoadingSpinner size="xs" variant="white" label="Approving..." />}
                 <span>{actionLoading ? 'Approving...' : 'Confirm Approval'}</span>
@@ -536,11 +536,11 @@ export default function DocumentDetailsPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowRejectModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-semibold transition"
+                  className="w-full sm:w-auto px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-semibold transition text-center"
                 >
                   Cancel
                 </button>
@@ -548,7 +548,7 @@ export default function DocumentDetailsPage() {
                   type="submit"
                   disabled={actionLoading || rejectReason.trim().length < 5}
                   aria-busy={actionLoading}
-                  className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                  className="w-full sm:w-auto px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold transition disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   {actionLoading && <LoadingSpinner size="xs" variant="white" label="Rejecting..." />}
                   <span>{actionLoading ? 'Rejecting...' : 'Reject Document'}</span>
@@ -601,11 +601,11 @@ export default function DocumentDetailsPage() {
                 </span>
               </label>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowRevokeModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-semibold"
+                  className="w-full sm:w-auto px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-semibold text-center"
                 >
                   Cancel
                 </button>
@@ -613,7 +613,7 @@ export default function DocumentDetailsPage() {
                   type="submit"
                   disabled={actionLoading || !revokeConfirmed || revokeReason.length < 5}
                   aria-busy={actionLoading}
-                  className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                  className="w-full sm:w-auto px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold transition disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   {actionLoading && <LoadingSpinner size="xs" variant="white" label="Revoking..." />}
                   <span>{actionLoading ? 'Revoking...' : 'Confirm Revocation'}</span>
@@ -654,11 +654,11 @@ export default function DocumentDetailsPage() {
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowVersionModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-semibold"
+                  className="w-full sm:w-auto px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-semibold text-center"
                 >
                   Cancel
                 </button>
@@ -666,7 +666,7 @@ export default function DocumentDetailsPage() {
                   type="submit"
                   disabled={actionLoading || versionReason.length < 5}
                   aria-busy={actionLoading}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                  className="w-full sm:w-auto px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   {actionLoading && <LoadingSpinner size="xs" variant="white" label="Creating Version..." />}
                   <span>{actionLoading ? 'Creating Version...' : 'Generate New Version'}</span>

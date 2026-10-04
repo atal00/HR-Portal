@@ -153,7 +153,7 @@ export default function EmployeesPage() {
             <div className="p-12 text-center text-xs text-slate-500">No employees found matching criteria.</div>
           ) : (
             <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full min-w-[700px] text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
                 <tr>
                   <th className="px-5 py-3">Employee ID & Name</th>
@@ -205,14 +205,14 @@ export default function EmployeesPage() {
                       <div className="flex items-center justify-end gap-1.5">
                         <Link
                           href={`/employees/${emp.id}`}
-                          className="p-1.5 rounded-md hover:bg-slate-200 text-slate-600 hover:text-blue-600 transition"
+                          className="p-2 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-md hover:bg-slate-200 text-slate-600 hover:text-blue-600 transition"
                           title="View Profile"
                         >
                           <Eye className="h-4 w-4" />
                         </Link>
                         <Link
                           href={`/employees/${emp.id}/edit`}
-                          className="p-1.5 rounded-md hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition"
+                          className="p-2 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-md hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition"
                           title="Edit Employee"
                         >
                           <Edit2 className="h-4 w-4" />

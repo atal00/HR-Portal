@@ -457,7 +457,7 @@ export default function TasksPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full min-w-[800px] text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
                 <tr>
                   <th className="px-5 py-3">Task</th>
@@ -712,11 +712,11 @@ export default function TasksPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-semibold cursor-pointer"
+                  className="w-full sm:w-auto px-4 py-2.5 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-semibold cursor-pointer text-center"
                 >
                   Cancel
                 </button>
@@ -724,7 +724,7 @@ export default function TasksPage() {
                   type="submit"
                   disabled={isSubmitting || !createTitle.trim()}
                   aria-busy={isSubmitting && actionType === 'CREATE'}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed flex items-center gap-1.5"
+                  className="w-full sm:w-auto justify-center px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed flex items-center gap-1.5 text-center"
                 >
                   {isSubmitting && actionType === 'CREATE' && (
                     <LoadingSpinner size="xs" variant="white" label="Creating..." />
@@ -868,8 +868,8 @@ export default function TasksPage() {
             )}
 
             {/* Workflow Action Buttons */}
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 pt-2">
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                 {/* Reassign button */}
                 {(isPrivileged || selectedTask.created_by === currentUser?.id) && !showReassignDropdown && (
                   <button

@@ -67,7 +67,7 @@ export default async function EmployeeDetailPage({ params }: Props) {
           </Link>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight">{employee.full_name}</h1>
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight break-words">{employee.full_name}</h1>
               <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">
                 {employee.employee_id}
               </span>
@@ -169,17 +169,17 @@ export default async function EmployeeDetailPage({ params }: Props) {
 
               <div>
                 <span className="text-slate-400 block text-[10px]">Corporate Work Email</span>
-                <span className="font-semibold text-slate-800 flex items-center gap-1.5 mt-0.5">
-                  <Mail className="h-3.5 w-3.5 text-slate-400" />
-                  {employee.email}
+                <span className="font-semibold text-slate-800 flex items-center gap-1.5 mt-0.5 break-all">
+                  <Mail className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                  <span>{employee.email}</span>
                 </span>
               </div>
 
               <div>
                 <span className="text-slate-400 block text-[10px]">Personal Email</span>
-                <span className="font-semibold text-slate-800 flex items-center gap-1.5 mt-0.5">
-                  <Mail className="h-3.5 w-3.5 text-slate-400" />
-                  {employee.personal_email || '—'}
+                <span className="font-semibold text-slate-800 flex items-center gap-1.5 mt-0.5 break-all">
+                  <Mail className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                  <span>{employee.personal_email || '—'}</span>
                 </span>
               </div>
 
@@ -300,9 +300,9 @@ export default async function EmployeeDetailPage({ params }: Props) {
             {employee.kyc_documents && Object.keys(employee.kyc_documents).length > 0 ? (
               <div className="space-y-2 text-xs">
                 {Object.entries(employee.kyc_documents).map(([key, val]) => (
-                  <div key={key} className="flex items-center justify-between p-2 bg-slate-50 rounded border border-slate-200">
-                    <span className="capitalize font-semibold text-slate-700">{key.replace(/_/g, ' ')}:</span>
-                    <span className="font-mono text-slate-500 text-[11px] truncate max-w-[200px]">{String(val)}</span>
+                  <div key={key} className="flex items-center justify-between p-2 bg-slate-50 rounded border border-slate-200 gap-2">
+                    <span className="capitalize font-semibold text-slate-700 shrink-0">{key.replace(/_/g, ' ')}:</span>
+                    <span className="font-mono text-slate-500 text-[11px] break-all text-right">{String(val)}</span>
                   </div>
                 ))}
               </div>
