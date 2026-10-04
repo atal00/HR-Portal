@@ -7,7 +7,7 @@ import { ExperienceLetterData } from '@/types/document';
 import { Employee } from '@/types/database';
 import { ExperienceLetterTemplate } from '@/components/documents/ExperienceLetterTemplate';
 import { calculateTenure } from '@/lib/utils';
-import { FileSpreadsheet, Eye, CheckCircle2, User, ArrowLeft, Clock, ShieldCheck } from 'lucide-react';
+import { FileSpreadsheet, Eye, CheckCircle2, User, ArrowLeft, Clock, ShieldCheck, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { LoadingSpinner } from '@/components/ui/Loading';
 
@@ -15,6 +15,8 @@ export default function GenerateExperienceLetterPage() {
   const router = useRouter();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmpId, setSelectedEmpId] = useState<string>('');
+  const [loadingEmployees, setLoadingEmployees] = useState(true);
+  const [employeeLoadError, setEmployeeLoadError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'form' | 'preview'>('form');
@@ -40,30 +42,55 @@ export default function GenerateExperienceLetterPage() {
 
   const formValues = watch();
 
-  useEffect(() => {
-    async function loadEmployees() {
-      try {
-        const res = await fetch('/api/employees?activeOnly=true');
-        if (res.ok) {
-          const list: Employee[] = await res.json();
-          const activeList = list.filter(
-            (e) => e.status !== 'INACTIVE' && e.status !== 'SEPARATED' && (e as any).deletion_status !== 'DELETED'
-          );
-          setEmployees(activeList);
-          if (activeList.length > 0) {
-            handleSelectEmployee(activeList[0].id, activeList[0]);
-          }
-        }
-      } catch (e) {
-        console.error(e);
+  const loadEmployees = async () => {
+    setLoadingEmployees(true);
+    setEmployeeLoadError(null);
+    try {
+      const res = await fetch('/api/employees', {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' },
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Failed to load employee directory (${res.status}).`);
       }
+      const list: Employee[] = await res.json();
+      // Authoritative directory excluding only deleted records
+      const eligibleList = list.filter(
+        (e) => (e as any).deletion_status !== 'DELETED'
+      );
+      setEmployees(eligibleList);
+      // STRICT REQUIREMENT: Initial selected employee ID must be null/empty. NEVER auto-select employees[0] or any hardcoded employee.
+    } catch (e: any) {
+      console.error('Failed to load employee directory:', e);
+      setEmployeeLoadError(e.message || 'Failed to load employee directory.');
+    } finally {
+      setLoadingEmployees(false);
     }
+  };
+
+  useEffect(() => {
     loadEmployees();
   }, []);
 
-  const handleSelectEmployee = (empId: string, preloadedEmp?: Employee) => {
+  const handleSelectEmployee = (empId: string) => {
     setSelectedEmpId(empId);
-    const emp = preloadedEmp || employees.find((e) => e.id === empId);
+    setError(null);
+
+    if (!empId) {
+      // User explicitly cleared selection: reset all employee-derived fields to clean neutral state
+      setValue('employeeName', '');
+      setValue('employeeId', '');
+      setValue('designation', '');
+      setValue('department', '');
+      setValue('joiningDate', '');
+      setValue('lastWorkingDate', '');
+      setValue('tenureText', '');
+      setValue('workLocation', '');
+      return;
+    }
+
+    const emp = employees.find((e) => e.id === empId);
     if (emp) {
       const actualDept = emp.department_name || emp.department || emp.custom_department || '';
       const lastDate = emp.last_working_date || new Date().toISOString().split('T')[0];
@@ -95,7 +122,11 @@ export default function GenerateExperienceLetterPage() {
       let empId = selectedEmpId;
       if (!empId) {
         const matched = employees.find((e) => e.employee_id === data.employeeId);
-        empId = matched ? matched.id : (employees[0]?.id || 'emp-placeholder');
+        empId = matched ? matched.id : '';
+      }
+
+      if (!empId) {
+        throw new Error('Please select an employee before generating the experience letter.');
       }
 
       const res = await fetch('/api/documents', {
@@ -168,9 +199,26 @@ export default function GenerateExperienceLetterPage() {
         </div>
       </div>
 
+      {employeeLoadError && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+            <span><strong>Directory Warning:</strong> {employeeLoadError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={loadEmployees}
+            className="text-[11px] font-bold text-amber-900 underline hover:text-amber-950"
+          >
+            Retry Loading
+          </button>
+        </div>
+      )}
+
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
-          <strong>Generation Error:</strong> {error}
+        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 text-red-600 shrink-0" />
+          <span><strong>Generation Error:</strong> {error}</span>
         </div>
       )}
 
@@ -191,9 +239,12 @@ export default function GenerateExperienceLetterPage() {
             <select
               value={selectedEmpId}
               onChange={(e) => handleSelectEmployee(e.target.value)}
-              className="px-3 py-1.5 border border-indigo-300 rounded-lg bg-white text-indigo-950 font-medium outline-none focus:ring-2 focus:ring-indigo-600"
+              disabled={loadingEmployees}
+              className="px-3 py-1.5 border border-indigo-300 rounded-lg bg-white text-indigo-950 font-medium outline-none focus:ring-2 focus:ring-indigo-600 disabled:bg-slate-100 disabled:text-slate-400"
             >
-              <option value="">-- Choose Employee --</option>
+              <option value="">
+                {loadingEmployees ? '-- Loading employees... --' : '-- Choose Employee --'}
+              </option>
               {employees.map((emp) => (
                 <option key={emp.id} value={emp.id}>
                   {emp.full_name} ({emp.employee_id}) - {emp.designation}

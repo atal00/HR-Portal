@@ -1,20 +1,20 @@
 import crypto from 'crypto';
 import { localDb } from './storage/mock-db';
-import { 
-  getSupabaseAdminClient, 
-  isSupabaseConfigured, 
-  isProductionEnv 
+import {
+  getSupabaseAdminClient,
+  isSupabaseConfigured,
+  isProductionEnv
 } from './supabase';
-import { 
-  Employee, 
-  EmployeeSalary, 
-  DocumentRecord, 
-  DocumentType, 
-  DocumentWorkflowStatus, 
-  User, 
-  Department, 
-  TemplateRecord, 
-  AuditLog, 
+import {
+  Employee,
+  EmployeeSalary,
+  DocumentRecord,
+  DocumentType,
+  DocumentWorkflowStatus,
+  User,
+  Department,
+  TemplateRecord,
+  AuditLog,
   SecurityLog,
   PublicVerificationResult,
   PublicVerificationStatus,
@@ -31,8 +31,8 @@ import {
 } from '@/types/database';
 import { ROLE_PERMISSIONS, PERMISSION_DESCRIPTIONS } from './rbac';
 import { logAuditEvent, logSecurityEvent } from './audit';
-import { 
-  generateVerificationId, 
+import {
+  generateVerificationId,
   formatDocumentNumber,
   formatEmployeeId,
   parseEmployeeIdSequence
@@ -1849,7 +1849,7 @@ export const db = {
 
         const { data, error } = await query;
         if (error) handleDbError('employees.list', error);
-        
+
         const mappedList = (data || []).map(mapSupabaseEmployee);
 
         // Batch merge emp_meta if any exist in system_settings
@@ -2044,7 +2044,7 @@ export const db = {
         }
 
         const fullName = (data.full_name || `${(data as any).first_name || ''} ${(data as any).last_name || ''}`).trim();
-        
+
         // Base columns that are guaranteed to exist in schema
         const corePayload: any = {
           employee_id: targetEmpId,
@@ -2955,8 +2955,8 @@ export const db = {
         throw new Error(`PAYROLL PROCESSING BLOCKED: Cannot modify or process compensation for an inactive or separated employee (${emp.full_name}, ${emp.employee_id}).`);
       }
 
-      let record = state.employee_salary.find((s) => 
-        s.employee_id === data.employee_id && 
+      let record = state.employee_salary.find((s) =>
+        s.employee_id === data.employee_id &&
         (data.effective_date ? s.effective_date === data.effective_date : true)
       );
 
@@ -3032,7 +3032,7 @@ export const db = {
       }
       if (filters?.search && filters.search.trim()) {
         const q = filters.search.trim().toLowerCase();
-        list = list.filter((d) => 
+        list = list.filter((d) =>
           d.document_number.toLowerCase().includes(q) ||
           d.verification_id.toLowerCase().includes(q) ||
           d.title.toLowerCase().includes(q) ||
@@ -3463,9 +3463,9 @@ export const db = {
     },
 
     async createNewVersion(
-      docId: string, 
-      newDataSnapshot: Record<string, any>, 
-      reason: string, 
+      docId: string,
+      newDataSnapshot: Record<string, any>,
+      reason: string,
       userId: string,
       userName: string
     ): Promise<DocumentRecord> {
@@ -3808,7 +3808,7 @@ export const db = {
       // Local fallback
       const state = localDb.getState();
       const doc = state.documents.find((d) => d.verification_id.toUpperCase() === cleanVId.toUpperCase());
-      
+
       let resultStatus: PublicVerificationStatus;
       if (!doc) {
         resultStatus = 'NOT_FOUND';
@@ -3943,6 +3943,29 @@ export const db = {
         logs = logs.filter((l) => l.action === actionFilter);
       }
       return logs.slice(0, limit);
+    },
+
+    async purgeExpired(retentionDays: number = 7): Promise<{ deletedCount: number; cutoff: string }> {
+      assertDatastoreMode();
+      const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+      if (isSupabaseMode()) {
+        const supabase = getSupabaseAdminClient();
+        const { error, count } = await supabase
+          .from('audit_logs')
+          .delete({ count: 'exact' })
+          .lt('created_at', cutoff);
+
+        if (error) handleDbError('auditLogs.purgeExpired', error);
+        return { deletedCount: count || 0, cutoff };
+      }
+
+      const state = localDb.getState();
+      const initialCount = state.audit_logs.length;
+      state.audit_logs = state.audit_logs.filter(
+        (l) => new Date(l.created_at).getTime() >= new Date(cutoff).getTime()
+      );
+      localDb.save();
+      return { deletedCount: initialCount - state.audit_logs.length, cutoff };
     }
   },
 
@@ -3961,6 +3984,250 @@ export const db = {
         return data || [];
       }
       return localDb.getState().security_logs.slice(0, limit);
+    },
+
+    async purgeExpired(retentionDays: number = 7): Promise<{ deletedCount: number; cutoff: string }> {
+      assertDatastoreMode();
+      const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+      if (isSupabaseMode()) {
+        const supabase = getSupabaseAdminClient();
+        const { error, count } = await supabase
+          .from('security_logs')
+          .delete({ count: 'exact' })
+          .lt('created_at', cutoff);
+
+        if (error) handleDbError('securityLogs.purgeExpired', error);
+        return { deletedCount: count || 0, cutoff };
+      }
+
+      const state = localDb.getState();
+      const initialCount = state.security_logs.length;
+      state.security_logs = state.security_logs.filter(
+        (l) => new Date(l.created_at).getTime() >= new Date(cutoff).getTime()
+      );
+      localDb.save();
+      return { deletedCount: initialCount - state.security_logs.length, cutoff };
+    }
+  },
+
+  logRetention: {
+    /**
+     * Executes the rolling 7-day retention policy on public.audit_logs and public.security_logs.
+     * Enforces an atomic database-backed 20-hour throttle using PostgreSQL row-level locking
+     * on public.system_settings('log_retention_status').
+     *
+     * Retention period is immutably fixed to 7 days.
+     * Only accepts an optional internal test override flag: { forceInternalTest?: boolean }
+     */
+    async executePolicy(options?: { forceInternalTest?: boolean }): Promise<{
+      skipped: boolean;
+      reason?: string;
+      last_executed_at: string;
+      retention_days: number;
+      cutoff_used: string;
+      audit_logs_purged: number;
+      security_logs_purged: number;
+      auditLogsDeleted: number;
+      securityLogsDeleted: number;
+      cutoff: string;
+      executedAt: string;
+    }> {
+      assertDatastoreMode();
+      // Retention period is strictly and immutably 7 days
+      const retentionDays = 7;
+      const forceInternalTest = Boolean(options?.forceInternalTest);
+
+      const THROTTLE_HOURS = 20;
+      const THROTTLE_MS = THROTTLE_HOURS * 60 * 60 * 1000;
+      const now = new Date();
+      const nowMs = now.getTime();
+      const nowIso = now.toISOString();
+      const cutoff20h = new Date(nowMs - THROTTLE_MS).toISOString();
+      const cutoff7d = new Date(nowMs - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+
+      if (isSupabaseMode()) {
+        const supabase = getSupabaseAdminClient();
+
+        // 1. Ensure initial status row exists in public.system_settings
+        const { data: existingRow } = await supabase
+          .from('system_settings')
+          .select('key, value, updated_at')
+          .eq('key', 'log_retention_status')
+          .maybeSingle();
+
+        if (!existingRow) {
+          const pastTime = new Date(nowMs - 25 * 3600 * 1000).toISOString();
+          await supabase.from('system_settings').insert({
+            key: 'log_retention_status',
+            value: {
+              last_executed_at: pastTime,
+              retention_days: retentionDays,
+              cutoff_used: cutoff7d,
+              audit_logs_purged: 0,
+              security_logs_purged: 0,
+            },
+            description: 'Rolling 7-day log retention execution telemetry',
+            updated_at: pastTime,
+          });
+        }
+
+        // 2. ATOMIC DATABASE CLAIM:
+        // Conditional UPDATE on public.system_settings with updated_at < cutoff20h.
+        // PostgreSQL's tuple lock and MVCC guarantee that under concurrency,
+        // exactly ONE transaction updates the row and receives data.length === 1.
+        // All concurrent requests re-evaluate the condition, fail it, and receive data.length === 0.
+        let claimQuery = supabase
+          .from('system_settings')
+          .update({
+            updated_at: nowIso,
+            description: 'Rolling 7-day log retention execution telemetry',
+          })
+          .eq('key', 'log_retention_status');
+
+        if (!forceInternalTest) {
+          claimQuery = claimQuery.lt('updated_at', cutoff20h);
+        }
+
+        const { data: claimData, error: claimErr } = await claimQuery.select('key, value, updated_at');
+        if (claimErr) {
+          handleDbError('logRetention.atomicClaim', claimErr);
+        }
+
+        if (!claimData || claimData.length === 0) {
+          // Throttled: Another request already claimed or ran retention within this 20-hour window
+          const currentMeta = (existingRow?.value as any) || {};
+          const lastRun = existingRow?.updated_at || currentMeta.last_executed_at || nowIso;
+          const elapsed = ((nowMs - new Date(lastRun).getTime()) / (60 * 60 * 1000)).toFixed(1);
+          const remaining = (THROTTLE_HOURS - parseFloat(elapsed)).toFixed(1);
+
+          console.log(
+            `[LOG RETENTION] Throttled: Retention policy executed ${elapsed}h ago (< 20h throttle window). ` +
+            `Next execution available in ${remaining}h.`
+          );
+
+          return {
+            skipped: true,
+            reason: `Throttled: Last execution was ${elapsed}h ago (< 20h throttle window)`,
+            last_executed_at: currentMeta.last_executed_at || lastRun,
+            retention_days: retentionDays,
+            cutoff_used: currentMeta.cutoff_used || cutoff7d,
+            audit_logs_purged: 0,
+            security_logs_purged: 0,
+            auditLogsDeleted: 0,
+            securityLogsDeleted: 0,
+            cutoff: currentMeta.cutoff_used || cutoff7d,
+            executedAt: currentMeta.last_executed_at || lastRun,
+          };
+        }
+
+        // 3. CLAIM GRANTED: We exclusively own this execution cycle
+        // Purge expired records from audit_logs and security_logs ONLY
+        const auditResult = await db.auditLogs.purgeExpired(retentionDays);
+        const securityResult = await db.securityLogs.purgeExpired(retentionDays);
+
+        const statusMetadata = {
+          last_executed_at: nowIso,
+          retention_days: retentionDays,
+          cutoff_used: cutoff7d,
+          audit_logs_purged: auditResult.deletedCount,
+          security_logs_purged: securityResult.deletedCount,
+        };
+
+        await supabase
+          .from('system_settings')
+          .update({ value: statusMetadata })
+          .eq('key', 'log_retention_status');
+
+        console.log(
+          `[LOG RETENTION] 7-Day Rolling Retention executed at ${nowIso}: ` +
+          `Purged ${auditResult.deletedCount} audit_logs, ${securityResult.deletedCount} security_logs ` +
+          `(Cutoff: ${cutoff7d}). Strictly preserved all active business records.`
+        );
+
+        return {
+          skipped: false,
+          last_executed_at: nowIso,
+          retention_days: retentionDays,
+          cutoff_used: cutoff7d,
+          audit_logs_purged: auditResult.deletedCount,
+          security_logs_purged: securityResult.deletedCount,
+          auditLogsDeleted: auditResult.deletedCount,
+          securityLogsDeleted: securityResult.deletedCount,
+          cutoff: cutoff7d,
+          executedAt: nowIso,
+        };
+      }
+
+      // Local / Mock Mode Fallback
+      const existingStatus = await db.systemSettings.get<{
+        last_executed_at: string;
+        retention_days: number;
+        cutoff_used: string;
+        audit_logs_purged: number;
+        security_logs_purged: number;
+      }>('log_retention_status');
+
+      if (!forceInternalTest && existingStatus?.last_executed_at) {
+        const lastRunMs = new Date(existingStatus.last_executed_at).getTime();
+        const diffMs = nowMs - lastRunMs;
+        if (diffMs >= 0 && diffMs < THROTTLE_MS) {
+          const elapsed = (diffMs / (60 * 60 * 1000)).toFixed(1);
+          return {
+            skipped: true,
+            reason: `Throttled: Last execution was ${elapsed}h ago (< 20h throttle window)`,
+            last_executed_at: existingStatus.last_executed_at,
+            retention_days: retentionDays,
+            cutoff_used: existingStatus.cutoff_used || cutoff7d,
+            audit_logs_purged: 0,
+            security_logs_purged: 0,
+            auditLogsDeleted: 0,
+            securityLogsDeleted: 0,
+            cutoff: existingStatus.cutoff_used || cutoff7d,
+            executedAt: existingStatus.last_executed_at,
+          };
+        }
+      }
+
+      const auditResult = await db.auditLogs.purgeExpired(retentionDays);
+      const securityResult = await db.securityLogs.purgeExpired(retentionDays);
+
+      const statusMetadata = {
+        last_executed_at: nowIso,
+        retention_days: retentionDays,
+        cutoff_used: cutoff7d,
+        audit_logs_purged: auditResult.deletedCount,
+        security_logs_purged: securityResult.deletedCount,
+      };
+
+      await db.systemSettings.set(
+        'log_retention_status',
+        statusMetadata,
+        'Rolling 7-day log retention execution telemetry'
+      );
+
+      return {
+        skipped: false,
+        last_executed_at: nowIso,
+        retention_days: retentionDays,
+        cutoff_used: cutoff7d,
+        audit_logs_purged: auditResult.deletedCount,
+        security_logs_purged: securityResult.deletedCount,
+        auditLogsDeleted: auditResult.deletedCount,
+        securityLogsDeleted: securityResult.deletedCount,
+        cutoff: cutoff7d,
+        executedAt: nowIso,
+      };
+    },
+
+    async getStatus(): Promise<{
+      last_executed_at: string;
+      retention_days: number;
+      cutoff_used: string;
+      audit_logs_purged: number;
+      security_logs_purged: number;
+    } | null> {
+      assertDatastoreMode();
+      return await db.systemSettings.get('log_retention_status');
     }
   },
 
@@ -4346,7 +4613,7 @@ export const db = {
         corporate_website: 'https://varsaka.com',
         corporate_email: 'info@varsaka.com',
         registered_office_address: 'APHB Colony, JV Colony, Indira Nagar, Gachibowli, Hyderabad, Telangana 500032',
-        cin: 'U72900TG2023PTC178920',
+        cin: '',
       };
 
       try {

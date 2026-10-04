@@ -39,7 +39,7 @@ export default async function AuditLogsPage() {
           Immutable Audit Trail
         </h1>
         <p className="text-xs text-slate-500 mt-1">
-          Chronological record of all authentication, employee, salary, document, and template operations
+          Chronological record of all authentication, employee, salary, document, and template operations (Audit Trail &amp; Security Logs retain the latest 7 days)
         </p>
       </div>
 

@@ -5,6 +5,9 @@ import { hasPermission } from '@/lib/rbac';
 import { logSecurityEvent } from '@/lib/audit';
 import { z } from 'zod';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const createEmployeeSchema = z.object({
   employee_id: z.string().optional(),
   full_name: z.string().min(2, 'Full Name is required'),
@@ -117,7 +120,13 @@ export async function GET(req: NextRequest) {
     if (activeOnly) {
       list = list.filter((e) => e.status !== 'INACTIVE' && e.status !== 'SEPARATED' && (e as any).deletion_status !== 'DELETED');
     }
-    return NextResponse.json(list);
+    return NextResponse.json(list, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        Pragma: 'no-cache',
+        Expires: '0',
+      },
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: error.status || 500 });
   }

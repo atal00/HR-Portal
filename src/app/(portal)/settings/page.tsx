@@ -55,7 +55,7 @@ export default function SettingsPage() {
     corporate_website: 'https://varsaka.com',
     corporate_email: 'info@varsaka.com',
     registered_office_address: 'APHB Colony, JV Colony, Indira Nagar, Gachibowli, Hyderabad, Telangana 500032',
-    cin: 'U72900TG2023PTC178920',
+    cin: '',
   });
   const [savingMeta, setSavingMeta] = useState(false);
 
@@ -564,7 +564,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <span className="text-slate-400 block mb-0.5">Corporate Identity Number (CIN)</span>
-              <span className="font-mono font-bold text-slate-800">{corporateMetadata?.cin || 'U72900TG2023PTC178920'}</span>
+              <span className="font-mono font-bold text-slate-800">{corporateMetadata?.cin || '—'}</span>
             </div>
             <div>
               <span className="text-slate-400 block mb-0.5">Last Metadata Revision</span>

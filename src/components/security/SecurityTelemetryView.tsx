@@ -245,7 +245,7 @@ export const SecurityTelemetryView: React.FC<Props> = ({ logs }) => {
               </span>
             </div>
             <p className="text-[11px] text-slate-500 mt-1">
-              Logged to persistent audit store
+              Audit Trail &amp; Security Logs retain the latest 7 days.
             </p>
           </div>
         </div>

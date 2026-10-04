@@ -30,6 +30,8 @@ export default function GenerateOfferLetterPage() {
   const router = useRouter();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmpId, setSelectedEmpId] = useState<string>('');
+  const [loadingEmployees, setLoadingEmployees] = useState(true);
+  const [employeeLoadError, setEmployeeLoadError] = useState<string | null>(null);
   const [salarySourceStatus, setSalarySourceStatus] = useState<'IDLE' | 'LOADING' | 'LOADED' | 'NOT_FOUND'>('IDLE');
   const [salaryMeta, setSalaryMeta] = useState<{ effectiveDate?: string; annualCtc?: number } | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -129,14 +131,30 @@ export default function GenerateOfferLetterPage() {
           }
         }
 
-        // Fetch employee directory
-        const empRes = await fetch('/api/employees?activeOnly=true');
-        if (empRes.ok) {
-          const list: Employee[] = await empRes.json();
-          const activeList = list.filter(
-            (e) => e.status !== 'INACTIVE' && e.status !== 'SEPARATED' && (e as any).deletion_status !== 'DELETED'
-          );
-          setEmployees(activeList);
+        // Fetch authoritative employee directory
+        setLoadingEmployees(true);
+        setEmployeeLoadError(null);
+        try {
+          const empRes = await fetch('/api/employees', {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache' },
+          });
+          if (empRes.ok) {
+            const list: Employee[] = await empRes.json();
+            const eligibleList = list.filter(
+              (e) => (e as any).deletion_status !== 'DELETED'
+            );
+            setEmployees(eligibleList);
+            // STRICT REQUIREMENT: Initial selected employee ID must be null/empty. NEVER auto-select employees[0].
+          } else {
+            const errData = await empRes.json().catch(() => ({}));
+            setEmployeeLoadError(errData.error || `Failed to load employee directory (${empRes.status})`);
+          }
+        } catch (fetchErr: any) {
+          console.error('Failed to load employees for offer letter:', fetchErr);
+          setEmployeeLoadError(fetchErr.message || 'Failed to load employee directory.');
+        } finally {
+          setLoadingEmployees(false);
         }
       } catch (e) {
         console.error('Failed to initialize offer generator:', e);
@@ -326,12 +344,32 @@ export default function GenerateOfferLetterPage() {
       const effectiveDate = formValues.offerDate || new Date().toISOString().split('T')[0];
       loadEmployeeCompensation(emp.id, effectiveDate);
     } else {
-      // Clear selection
+      // Clear selection: restore neutral form state and clear employee-derived fields
       setValue('candidateName', '');
       setValue('candidateAddress', '');
       setValue('designation', '');
       setValue('department', '');
       setValue('employeeCode', '');
+      setValue('annualCtc', 0);
+      setValue('annualCtcWords', '');
+      setValue('yearlyVariable', 0);
+      setValue('basic', 0);
+      setValue('hra', 0);
+      setValue('communicationAllowance', 0);
+      setValue('travelAllowance', 0);
+      setValue('foodAllowance', 0);
+      setValue('otherAllowances', 0);
+      setValue('monthlyGrossSalary', 0);
+      setValue('employeePf', 0);
+      setValue('employerPf', 0);
+      setValue('professionalTax', 0);
+      setValue('gratuity', 0);
+      setValue('tds', 0);
+      setValue('monthlyNetSalary', 0);
+      setValue('calculatedNetInHand', 0);
+      setValue('finalNetInHand', 0);
+      setValue('netInHandMode', 'AUTO');
+      setValue('overrideReason', '');
       setSalarySourceStatus('IDLE');
       setSalaryMeta(null);
     }
@@ -415,7 +453,11 @@ export default function GenerateOfferLetterPage() {
       let empId = selectedEmpId;
       if (!empId) {
         const matched = employees.find((e) => e.employee_id === data.employeeCode);
-        empId = matched ? matched.id : (employees[0]?.id || 'emp-placeholder');
+        empId = matched ? matched.id : '';
+      }
+
+      if (!empId) {
+        throw new Error('Please select an employee from the directory before generating the offer letter.');
       }
 
       const docTitle = data.isSalaryRevision
@@ -506,6 +548,39 @@ export default function GenerateOfferLetterPage() {
         </div>
       </div>
 
+      {employeeLoadError && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+            <span><strong>Directory Warning:</strong> {employeeLoadError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              setLoadingEmployees(true);
+              setEmployeeLoadError(null);
+              try {
+                const res = await fetch('/api/employees', { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+                if (res.ok) {
+                  const list = await res.json();
+                  setEmployees(list.filter((e: any) => e.deletion_status !== 'DELETED'));
+                } else {
+                  const errData = await res.json().catch(() => ({}));
+                  setEmployeeLoadError(errData.error || `Failed to load employees (${res.status})`);
+                }
+              } catch (e: any) {
+                setEmployeeLoadError(e.message || 'Failed to load employees');
+              } finally {
+                setLoadingEmployees(false);
+              }
+            }}
+            className="text-[11px] font-bold text-amber-900 underline hover:text-amber-950"
+          >
+            Retry Loading
+          </button>
+        </div>
+      )}
+
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 shrink-0 text-red-600" />
@@ -531,9 +606,12 @@ export default function GenerateOfferLetterPage() {
               <select
                 value={selectedEmpId}
                 onChange={(e) => handleSelectEmployee(e.target.value)}
-                className="px-3 py-2 border border-blue-300 rounded-lg bg-blue-50/50 text-blue-950 font-medium outline-none focus:ring-2 focus:ring-blue-600"
+                disabled={loadingEmployees}
+                className="px-3 py-2 border border-blue-300 rounded-lg bg-blue-50/50 text-blue-950 font-medium outline-none focus:ring-2 focus:ring-blue-600 disabled:bg-slate-100 disabled:text-slate-400"
               >
-                <option value="">-- Choose from Employee Directory --</option>
+                <option value="">
+                  {loadingEmployees ? '-- Loading employees... --' : '-- Choose from Employee Directory --'}
+                </option>
                 {employees.map((emp) => (
                   <option key={emp.id} value={emp.id}>
                     {emp.full_name} ({emp.employee_id}) — {emp.designation}

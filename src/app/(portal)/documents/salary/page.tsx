@@ -20,6 +20,8 @@ export default function GenerateSalarySlipPage() {
   const router = useRouter();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmpId, setSelectedEmpId] = useState<string>('');
+  const [loadingEmployees, setLoadingEmployees] = useState(true);
+  const [employeeLoadError, setEmployeeLoadError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'form' | 'preview'>('form');
@@ -58,30 +60,69 @@ export default function GenerateSalarySlipPage() {
 
   const formValues = watch();
 
-  useEffect(() => {
-    async function loadEmployees() {
-      try {
-        const res = await fetch('/api/employees?activeOnly=true');
-        if (res.ok) {
-          const list: Employee[] = await res.json();
-          const activeList = list.filter(
-            (e) => e.status !== 'INACTIVE' && e.status !== 'SEPARATED' && (e as any).deletion_status !== 'DELETED'
-          );
-          setEmployees(activeList);
-          if (activeList.length > 0) {
-            handleSelectEmployee(activeList[0].id, activeList[0]);
-          }
-        }
-      } catch (e) {
-        console.error(e);
+  const loadEmployees = async () => {
+    setLoadingEmployees(true);
+    setEmployeeLoadError(null);
+    try {
+      const res = await fetch('/api/employees', {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' },
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Failed to load employee directory (${res.status}).`);
       }
+      const list: Employee[] = await res.json();
+      const eligibleList = list.filter(
+        (e) => (e as any).deletion_status !== 'DELETED'
+      );
+      setEmployees(eligibleList);
+      // STRICT: Never auto-select an employee
+    } catch (e: any) {
+      console.error('Failed to load employee directory:', e);
+      setEmployeeLoadError(e.message || 'Failed to load employee directory.');
+    } finally {
+      setLoadingEmployees(false);
     }
+  };
+
+  useEffect(() => {
     loadEmployees();
   }, []);
 
-  const handleSelectEmployee = async (empId: string, preloadedEmp?: Employee) => {
+  const handleSelectEmployee = async (empId: string) => {
     setSelectedEmpId(empId);
-    const emp = preloadedEmp || employees.find((e) => e.id === empId);
+    setError(null);
+
+    if (!empId) {
+      // Clear all fields to restore neutral state
+      setValue('employeeName', '');
+      setValue('employeeId', '');
+      setValue('designation', '');
+      setValue('department', '');
+      setValue('joiningDate', '');
+      setValue('bankAccountNumber', '');
+      setValue('panNumber', '');
+      setValue('pfNumber', '');
+      setValue('basic', 0);
+      setValue('hra', 0);
+      setValue('communicationAllowance', 0);
+      setValue('travelAllowance', 0);
+      setValue('foodAllowance', 0);
+      setValue('otherAllowances', 0);
+      setValue('grossSalary', 0);
+      setValue('employeePf', 0);
+      setValue('employerPf', 0);
+      setValue('professionalTax', 0);
+      setValue('gratuity', 0);
+      setValue('tds', 0);
+      setValue('totalDeductions', 0);
+      setValue('netSalary', 0);
+      setValue('netSalaryInWords', 'Zero Rupees Only');
+      return;
+    }
+
+    const emp = employees.find((e) => e.id === empId);
     if (!emp) return;
 
     const actualDept = emp.department_name || emp.department || emp.custom_department || '';
@@ -170,7 +211,11 @@ export default function GenerateSalarySlipPage() {
       let empId = selectedEmpId;
       if (!empId) {
         const matched = employees.find((e) => e.employee_id === data.employeeId);
-        empId = matched ? matched.id : (employees[0]?.id || 'emp-test-001');
+        empId = matched ? matched.id : '';
+      }
+
+      if (!empId) {
+        throw new Error('Please select an employee before generating the salary slip.');
       }
 
       const res = await fetch('/api/documents', {
@@ -239,6 +284,21 @@ export default function GenerateSalarySlipPage() {
         </div>
       </div>
 
+      {employeeLoadError && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span><strong>Directory Warning:</strong> {employeeLoadError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={loadEmployees}
+            className="text-[11px] font-bold text-amber-900 underline hover:text-amber-950"
+          >
+            Retry Loading
+          </button>
+        </div>
+      )}
+
       {error && (
         <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-xs text-red-800">
           <strong>Generation Error:</strong> {error}
@@ -255,9 +315,12 @@ export default function GenerateSalarySlipPage() {
               <select
                 value={selectedEmpId}
                 onChange={(e) => handleSelectEmployee(e.target.value)}
-                className="w-full px-3 py-1.5 border border-emerald-300 rounded-lg bg-white text-emerald-950 font-medium outline-none focus:ring-2 focus:ring-emerald-600"
+                disabled={loadingEmployees}
+                className="w-full px-3 py-1.5 border border-emerald-300 rounded-lg bg-white text-emerald-950 font-medium outline-none focus:ring-2 focus:ring-emerald-600 disabled:bg-slate-100 disabled:text-slate-400"
               >
-                <option value="">-- Choose Employee --</option>
+                <option value="">
+                  {loadingEmployees ? '-- Loading employees... --' : '-- Choose Employee --'}
+                </option>
                 {employees.map((emp) => (
                   <option key={emp.id} value={emp.id}>
                     {emp.full_name} ({emp.employee_id})

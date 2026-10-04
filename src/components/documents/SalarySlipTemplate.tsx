@@ -35,7 +35,7 @@ export const SalarySlipTemplate: React.FC<Props> = ({
               <div>
                 <h1 className="text-lg font-black text-blue-950 tracking-wider">VARSAKA LABS</h1>
                 <p className="text-[10px] text-slate-600">APHB Colony, JV Colony, Indira Nagar, Gachibowli, Hyderabad, Telangana 500032</p>
-                <p className="text-[8.5pt] text-slate-500">Corporate Identity No: U72900TG2023PTC178920 • Web: https://varsaka.com</p>
+                <p className="text-[8.5pt] text-slate-500">Web: https://varsaka.com</p>
               </div>
             </div>
             <div className="text-right">
