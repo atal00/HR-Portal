@@ -53,7 +53,7 @@ export default function SettingsPage() {
     brand_name: 'Varsaka Labs',
     legal_entity: 'Varsaka Labs',
     corporate_website: 'https://varsaka.com',
-    corporate_email: 'info@varsakalabs.com',
+    corporate_email: 'info@varsaka.com',
     registered_office_address: 'APHB Colony, JV Colony, Indira Nagar, Gachibowli, Hyderabad, Telangana 500032',
     cin: 'U72900TG2023PTC178920',
   });
@@ -560,7 +560,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <span className="text-slate-400 block mb-0.5">Corporate Communications</span>
-              <span className="font-mono text-slate-700">{corporateMetadata?.corporate_email || 'info@varsakalabs.com'}</span>
+              <span className="font-mono text-slate-700">{corporateMetadata?.corporate_email || 'info@varsaka.com'}</span>
             </div>
             <div>
               <span className="text-slate-400 block mb-0.5">Corporate Identity Number (CIN)</span>

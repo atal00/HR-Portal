@@ -141,7 +141,7 @@ export const OfferLetterTemplate: React.FC<Props> = ({
         <div className="pt-4 border-t border-slate-300 text-[9pt] text-slate-500 text-center flex flex-col items-center">
           <div>Address: APHB Colony, JV Colony, Indira Nagar, Gachibowli, Hyderabad, Telangana 500032.</div>
           <div className="text-[8pt] text-slate-400 mt-1">
-            Email: info@varsakalabs.com &nbsp;|&nbsp; Web: https://varsaka.com/ &nbsp;|&nbsp; Phone: +91 40 6000 0000
+            Email: info@varsaka.com &nbsp;|&nbsp; Web: https://varsaka.com/ &nbsp;|&nbsp; Phone: +91 40 6000 0000
           </div>
           <div className="mt-1 text-[8pt] font-mono text-slate-400">Page 1 of 16 • Doc: {documentNumber}</div>
         </div>

@@ -4344,7 +4344,7 @@ export const db = {
         brand_name: 'Varsaka Labs',
         legal_entity: 'Varsaka Labs',
         corporate_website: 'https://varsaka.com',
-        corporate_email: 'info@varsakalabs.com',
+        corporate_email: 'info@varsaka.com',
         registered_office_address: 'APHB Colony, JV Colony, Indira Nagar, Gachibowli, Hyderabad, Telangana 500032',
         cin: 'U72900TG2023PTC178920',
       };

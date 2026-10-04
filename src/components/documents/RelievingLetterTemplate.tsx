@@ -135,7 +135,7 @@ export const RelievingLetterTemplate: React.FC<Props> = ({
       <div className="pt-2 border-t border-slate-300 text-[8pt] text-slate-500 text-center">
         <div>Varsaka Labs • APHB Colony, JV Colony, Indira Nagar, Gachibowli, Hyderabad, Telangana 500032.</div>
         <div className="text-[7.5pt] text-slate-400 mt-0.5">
-          Email: info@varsakalabs.com • Web: https://varsaka.com/ • Verification: {verificationUrl}
+          Email: info@varsaka.com • Web: https://varsaka.com/ • Verification: {verificationUrl}
         </div>
       </div>
 

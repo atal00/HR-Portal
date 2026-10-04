@@ -201,7 +201,7 @@ export const SalarySlipTemplate: React.FC<Props> = ({
       {/* Footer Notes */}
       <div className="pt-4 border-t border-slate-300 text-[8pt] text-slate-500 text-center space-y-0.5">
         <div>Note: This is a system-generated electronic payroll document and requires no physical ink signature.</div>
-        <div>Varsaka Labs • Registered Office: Hyderabad, Telangana, India • info@varsakalabs.com</div>
+        <div>Varsaka Labs • Registered Office: Hyderabad, Telangana, India • info@varsaka.com</div>
       </div>
 
     </div>

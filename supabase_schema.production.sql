@@ -755,7 +755,7 @@ INSERT INTO system_settings (key, value, description) VALUES
     "company_name": "Varsaka Labs",
     "legal_entity": "Varsaka Labs",
     "website": "https://varsaka.com",
-    "email": "info@varsakalabs.com",
+    "email": "info@varsaka.com",
     "phone": "+91 40 6000 0000",
     "address": "APHB Colony, JV Colony, Indira Nagar, Gachibowli, Hyderabad, Telangana 500032",
     "signatory_title": "Authorized Signatory",
